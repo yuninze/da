@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import scipy.stats
 from full_fred.fred import Fred
-from da_vis import *
+from vis import *
 
 
 # innermost params
@@ -183,6 +183,6 @@ if q=="y" or q=="Y":
 
     fg,ax=plt.subplots(1,3,figsize=(12,12))
     fg.suptitle("da_ed")
-
-# sns.kdeplot(fs0Tot["ng"],x="ng")
-# sns.displot(fs0Tot["ng"],x="ng",bins=10)
+    
+    # sns.kdeplot(fs0Tot["ng"],x="ng")
+    # sns.displot(fs0Tot["ng"],x="ng",bins=10)
