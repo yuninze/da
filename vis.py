@@ -95,9 +95,12 @@ def pp(q,r=None,w=None,e=None,
     plt.show(block=False)
     return f"pp: shown in {t()-t0:.3f}s"
 
-def hm(q,title="heatmap [-1,1]",figsize=(12,12),
-    minmax=(-1,1),fmt=".3f",
-    corner=False):
+def hm(q,
+    title="heatmap [-1,1]",
+    minmax=(-1,1),
+    fmt=".3f",
+    corner=True,
+    ax=None):
     t0=t()
     #have corr df
     q_corr=q.corr()
@@ -106,18 +109,15 @@ def hm(q,title="heatmap [-1,1]",figsize=(12,12),
         mask=np.triu(np.ones_like(q_corr,dtype=bool))
     else:
         mask=None
-    plt.subplots(figsize=figsize)
     cmap=sns.diverging_palette(240,10,as_cmap=True)
-    sns.set_theme(style="whitegrid",font="monospace")
-    #plt object
+    sns.set_theme(font="monospace")
     sns.heatmap(q_corr,
         vmin=minmax[0],vmax=minmax[1],
         mask=mask,cmap=cmap,
-        annot=True,center=0,square=True,linewidths=.5,fmt=fmt)
+        annot=True,center=0,square=True,linewidths=.5,fmt=fmt,ax=ax)
     plt.xlabel(f"q.x")
     plt.ylabel(f"q.y")
     plt.title(title)
-    plt.show(block=False)
     return f"hm: shown in {t()-t0:.3f}s"
 
 def bp(q,w=None,e=None,title="title"):
