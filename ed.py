@@ -114,13 +114,13 @@ def zs(f:pd.DataFrame,pctrng=(0.1,99.9),intp=False)->pd.DataFrame:
         q=q.dropna()
 
         nor_zs=scipy.stats.zscore(q)
-
+        
         q_=(q-q.min())/(q.max()-q.min())
         log_zs=pd.DataFrame(scipy.stats.zscore(
             scipy.stats.yeojohnson(q_)[0]),index=q.index)
         
         prb_zs=pd.concat(
-                [pd.DataFrame(w,index=q.index) for w in  
+                [pd.DataFrame(w,index=q.index) for w in 
                 [scipy.stats.norm.pdf(np.absolute(e)) for e in 
                 [nor_zs,log_zs]]]
                 ,axis=1)
@@ -159,7 +159,7 @@ def prng(f:pd.DataFrame,i:str,rng=(.05,5),dropna=True,
             rng[q],f[f"{colp}rng"])
     if dropna:
         f=f.dropna(subset=f"{colp}rng")
-    f.update(f[f"{colp}rng"].astype("category"))
+    f.update(f.loc[:,f"{colp}rng"].astype("category"))
     print(f"elapsed {t()-t0:.2f}s (prng): {rng}")
     return f
 
@@ -206,30 +206,30 @@ def hm(q,title="heatmap [-1,1]",
     plt.title(title)
 
 
-def vis(f,c_="deep"):
-    if len(f.columns)>20:return f"{len(f.columns)} columns are too much"
+#     def vis(f,c_="deep"):
+#         if len(f.columns)>20:return f"{len(f.columns)} columns are too much"
 
-    sns.set_style("whitegrid")
-    sns.set_context("talk")
+#         sns.set_style("whitegrid")
+#         sns.set_context("poster")
 
-    mm=(-1,1)
-    fg,ax=plt.subplots(1,3)
-    hm(f,
-    minmax=mm,title=f"org",cbar=False,ax=ax[0])
-    hm(f.dropna(),
-    minmax=mm,title=f"dropna",cbar=False,ax=ax[1])
-    hm(f.interpolate(method="time").dropna(),
-    minmax=mm,title=f"interpolated, dropna",cbar=False,ax=ax[2])
+#         mm=(-1,1)
+#         fg,ax=plt.subplots(1,3)
+#         hm(f,
+#         minmax=mm,title=f"org",cbar=False,ax=ax[0])
+#         hm(f.dropna(),
+#         minmax=mm,title=f"dropna",cbar=False,ax=ax[1])
+#         hm(f.interpolate(method="time").dropna(),
+#         minmax=mm,title=f"interpolated, dropna",cbar=False,ax=ax[2])
 
-    f_=f.interpolate(method="time")
-    (sns.pairplot(f_,
-        vars=f.columns,
-        hue=None,
-        dropna=False,
-        kind="scatter",
-        diag_kind="hist",
-        palette=c_)
-    .map_diag(sns.histplot,multiple="stack",element="step"))
+#         f_=f.interpolate(method="time")
+#         (sns.pairplot(f_,
+#             vars=f.columns,
+#             hue=None,
+#             dropna=False,
+#             kind="scatter",
+#             diag_kind="hist",
+#             palette=c_)
+#         .map_diag(sns.histplot,multiple="stack",element="step"))]
 
     # sns.relplot(ff,x="30ym",y="zs",
     #     hue=None,palette=c_,
@@ -240,3 +240,12 @@ def vis(f,c_="deep"):
         
     # sns.kdeplot(fs0Tot["ng"],x="ng")
     # sns.displot(fs0Tot["ng"],x="ng",bins=10)
+
+
+def regr(x,y,dm=2,s=1):
+	q=np.polynomial.polynomial.polyfit(x,y,dm)
+	plt.scatter(x,y,s=s)
+	plt.plot(x,np.polynomial.polynomial.polyval(x,q),linestyle="--",label="polyval")
+	plt.legend(prop={"family":"monospace"})
+	plt.grid(visible=True)
+	plt.show()
