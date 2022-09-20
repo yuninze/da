@@ -1,13 +1,19 @@
-from glob import glob
 import requests
 import numpy as np
 import pandas as pd
 import scipy.stats
 import matplotlib.pyplot as plt
 import seaborn as sns
-from full_fred.fred import Fred
-from bs4 import BeautifulSoup as bs
+
+from glob import glob
 from time import time as t
+from bs4 import BeautifulSoup as bs
+from full_fred.fred import Fred
+
+from sklearn.linear_model import LinearRegression as lr
+from sklearn.ensemble import RandomForestRegressor as rfr
+from sklearn.model_selection import train_test_split as tts
+from sklearn.model_selection import GridSearchCV as gs
 
 
 # innermost params
@@ -47,7 +53,7 @@ def upd(url:str,i:str):
         val =naiyou[a].select("td")[s].text
         cache.append((date,val))
     s=pd.DataFrame(cache,columns=["date",f"{i}"])
-    s["date"]=pd.to_datetime(s["date"],yearfirst=True)
+    s["date"]=pd.to_datetime(s["date"])
     s=((s.set_index("date").iloc[:,0].str.replace(",",""))
         .astype(float))
     return s
@@ -65,14 +71,18 @@ def getdata(local=True,update=True,roll=False)->pd.DataFrame:
         int={
             "cys":"BAMLH0A0HYM2",
             "5yi":"T5YIE",
+            "pce":"PCETRIM12M159SFRBDAL",
             "10yt":"DGS10",
             "ng":"DHHNGSP",
             "wti":"DCOILWTICO",
-            "ffr":"DFF"
+            "ffr":"DFF",
         }
         ext={
             "zs":"https://www.investing.com/commodities/us-soybeans-historical-data",
             "hg":"https://www.investing.com/commodities/copper-historical-data",
+            "ng":"https://www.investing.com/commodities/natural-gas-historical-data",
+            "wti":"https://www.investing.com/commodities/crude-oil-historical-data",
+            "hsi":"https://www.investing.com/indices/hang-sen-40-historical-data",
         }
         fed=Fred("c:/code/fed")
         fs={i:fed.get_series_df(int[i])
@@ -129,7 +139,7 @@ def zs(f:pd.DataFrame,pctrng=(0.1,99.9),intp=False)->pd.DataFrame:
             .set_axis(
                 [f"{i}",f"{i}nzs",f"{i}lzs",f"{i}nzsprb",f"{i}lzsprb"],
                 axis=1))
-        
+
         fcache.append(w)
         print(f"zs::col::{i}")
     f=full_range_idx(f).join(pd.concat(fcache,axis=1),how="left")
@@ -159,7 +169,7 @@ def prng(f:pd.DataFrame,i:str,rng=(.05,5),dropna=True,
             rng[q],f[f"{colp}rng"])
     if dropna:
         f=f.dropna(subset=f"{colp}rng")
-    f.update(f.loc[:,f"{colp}rng"].astype("category"))
+    f.update(f.copy().loc[:,f"{colp}rng"].astype("category"))
     print(f"elapsed {t()-t0:.2f}s (prng): {rng}")
     return f
 
@@ -176,14 +186,6 @@ def locate(f,i:str,v:float,test=True):
     if test:
         print(f"{q[4]*100:.2f}% ({rowidx=}, {colidx=})")
     return q
-
-
-def exec(i,prng_=(.03,5),local=False,roll=False,intp=False):
-    hue=f"{i}zsprbrng"
-    f=getdata(local=local,roll=roll)
-    ff=zs(f,intp=intp)
-    fff=prng(ff,i,rng=prng_)
-    return f,ff,fff
 
 
 def hm(q,title="heatmap [-1,1]",
@@ -206,46 +208,84 @@ def hm(q,title="heatmap [-1,1]",
     plt.title(title)
 
 
-#     def vis(f,c_="deep"):
-#         if len(f.columns)>20:return f"{len(f.columns)} columns are too much"
+# def vis(f,c_="deep"):
+#     if len(f.columns)>20:return f"{len(f.columns)} columns are too much"
 
-#         sns.set_style("whitegrid")
-#         sns.set_context("poster")
+#     sns.set_style("whitegrid")
+#     sns.set_context("poster")
 
-#         mm=(-1,1)
-#         fg,ax=plt.subplots(1,3)
-#         hm(f,
-#         minmax=mm,title=f"org",cbar=False,ax=ax[0])
-#         hm(f.dropna(),
-#         minmax=mm,title=f"dropna",cbar=False,ax=ax[1])
-#         hm(f.interpolate(method="time").dropna(),
-#         minmax=mm,title=f"interpolated, dropna",cbar=False,ax=ax[2])
+#     mm=(-1,1)
+#     fg,ax=plt.subplots(1,3)
+#     hm(f,
+#     minmax=mm,title=f"org",cbar=False,ax=ax[0])
+#     hm(f.dropna(),
+#     minmax=mm,title=f"dropna",cbar=False,ax=ax[1])
+#     hm(f.interpolate(method="time").dropna(),
+#     minmax=mm,title=f"interpolated, dropna",cbar=False,ax=ax[2])
 
-#         f_=f.interpolate(method="time")
-#         (sns.pairplot(f_,
-#             vars=f.columns,
-#             hue=None,
-#             dropna=False,
-#             kind="scatter",
-#             diag_kind="hist",
-#             palette=c_)
-#         .map_diag(sns.histplot,multiple="stack",element="step"))]
+#     f_=f.interpolate(method="time")
+#     (sns.pairplot(f_,
+#         vars=f.columns,
+#         hue=None,
+#         dropna=False,
+#         kind="scatter",
+#         diag_kind="hist",
+#         palette=c_)
+#     .map_diag(sns.histplot,multiple="stack",element="step"))]
 
-    # sns.relplot(ff,x="30ym",y="zs",
-    #     hue=None,palette=c_,
-    #     size="wti",sizes=(1,150))
+# sns.relplot(ff,x="30ym",y="zs",
+#     hue=None,palette=c_,
+#     size="wti",sizes=(1,150))
 
-    # fg,ax=plt.subplots(1,3,figsize=(12,12))
-    # fg.suptitle("da_ed")
-        
-    # sns.kdeplot(fs0Tot["ng"],x="ng")
-    # sns.displot(fs0Tot["ng"],x="ng",bins=10)
+# fg,ax=plt.subplots(1,3,figsize=(12,12))
+# fg.suptitle("da_ed")
+    
+# sns.kdeplot(fs0Tot["ng"],x="ng")
+# sns.displot(fs0Tot["ng"],x="ng",bins=10)
 
 
-def regr(x,y,dm=2,s=1):
-	q=np.polynomial.polynomial.polyfit(x,y,dm)
-	plt.scatter(x,y,s=s)
-	plt.plot(x,np.polynomial.polynomial.polyval(x,q),linestyle="--",label="polyval")
-	plt.legend(prop={"family":"monospace"})
-	plt.grid(visible=True)
-	plt.show()
+def regr__(x,y,s):
+    f__=pd.read_csv("c:/code/fx.csv") 
+    x__=["10yt","pce","ffr","wti","ng","zs","hg"]
+    y__=["5yi"]
+    # f.update(
+    # f.loc[:,me].interpolate("index").dropna(how="any",subset=me))
+    x,x_,y,y_=tts(f__[x__],f__[y__])
+    r=lr(n_jobs=1)
+    r.fit(x,y)
+    r.coef_
+    r.score(x,y)
+
+
+def regr_(x,y,s=0.2,v=False,gs_=True):
+    x,x_,y,y_=tts(x,y,test_size=s)
+    r=rfr(n_jobs=-1,random_state=5,verbose=1)
+    r.fit(x,y)
+    y__=r.predict(x_)
+    print(f"r2::{r.score(x_,y_)}")
+    if v:
+        plt.figure(figsize=(15,8))
+        plt.plot(np.asarray(y_),label="real")
+        plt.plot(np.asarray(y__),label="intp")
+        plt.legend(prop={"family":"monospace"})
+        plt.grid(visible=True)
+    if gs_:
+        params={
+            "n_estimators":[20,40,80,100],
+            "max_features":[a for a in np.arange(1,x.shape[1])],
+            "min_samples_split":[16,32,64,96,192],
+            "max_depth":[64,96,192],
+            "n_jobs":[1],
+            "random_state":[0]
+        }
+        rslt=gs(rfr(),params,cv=3,n_jobs=-1,verbose=3)
+        rslt.fit(x,y)
+        return [x,x_,y,y_,rslt]
+# rslt=regr_(f_[x__],f_[y__[0]])
+
+
+def exec(i,prng_=(.03,5),local=False,roll=False,intp=False):
+    f=getdata(local=local,roll=roll)
+    ff=zs(f,intp=intp)
+    fff=prng(ff,i,rng=prng_)
+    return f,ff,fff
