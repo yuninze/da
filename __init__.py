@@ -2,6 +2,7 @@ import os
 import requests
 import numpy as np
 import pandas as pd
+import joblib
 import scipy.stats
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -37,9 +38,7 @@ ext={
 }
 
 
-sns.set_theme("poster","whitegrid","deep","monospace",
-    font_scale=0.5,
-    rc={"lines.linestyle":"-"})
+sns.set_theme(style="whitegrid",palette="bright",font="monospace",rc={"lines.linestyle":"-"})
 pd.options.display.min_rows=6
 pd.options.display.float_format=lambda q:f"{q:.5f}"
 
@@ -67,8 +66,7 @@ def apnd(path:str)->pd.DataFrame:
          os.scandir(path) if ".csv" in q.name],axis=0)
 
 
-def mon(f:pd.DataFrame,
-    start,stop)->np.ndarray:
+def mon(f:pd.DataFrame,start,stop)->np.ndarray:
     a=sum([f.index.month==q for q in np.arange(start,stop,1)])
     return np.asarray(a,dtype="bool")
 
@@ -89,7 +87,8 @@ def upd(url:str,i:str):
     return s
 
 
-def getdata(local=True,update=True,roll=1)->pd.DataFrame:
+def getdata(
+    local=True,update=True,roll=1)->pd.DataFrame:
     t0=t()
 
     if local:
@@ -116,11 +115,9 @@ def getdata(local=True,update=True,roll=1)->pd.DataFrame:
             [f.update(upd(ext[i],i)) for i in ext]
         f.to_csv(f"{PATH}data0.csv",encoding="utf-8-sig")
     f=messij(f)
-
     if roll!=1:
             f=f.rolling(roll,min_periods=roll//2).mean()
             print(f"rolled::{roll//2}")
-    
     print(f"getdata::elapsed {t()-t0:.1f}s::{local=},{update=},{roll=}")
     return f
 
@@ -128,7 +125,6 @@ def getdata(local=True,update=True,roll=1)->pd.DataFrame:
 def zs(f:pd.DataFrame,
     pctrng=(0.2,99.8),intp=False)->pd.DataFrame:
     t0=t()
-    
     fcache=[]
     for i in f.columns:
         if intp:
@@ -139,32 +135,25 @@ def zs(f:pd.DataFrame,
         else:
             q=(f[i]
             .dropna())
-        
         mm=np.percentile(q,pctrng)
         q[(q<=mm[0])|(q>=mm[1])]=np.nan
         q=q.dropna()
-
         nz=scipy.stats.zscore(q)
-        
         q_=(q-q.min())/(q.max()-q.min())
         lz=pd.DataFrame(scipy.stats.zscore(
             scipy.stats.yeojohnson(q_)[0]),index=q.index)
-        
         zp=pd.concat(
                 [pd.DataFrame(w,index=q.index) for w in 
                 [scipy.stats.norm.pdf(np.absolute(e)) for e in 
                 [nz,lz]]]
                 ,axis=1)
-        
         w=(pd.concat([q,nz,lz,zp],axis=1)
             .set_axis([f"{i}",f"{i}nz",f"{i}lz",f"{i}nzp",f"{i}lzp"],
                 axis=1))
         fcache.append(w)
         print(f"zs::col::{i}")
-    
     f=full_range_idx(f).join(pd.concat(fcache,axis=1),how="left")
     f.to_csv(f"{PATH}data1.csv",encoding="utf-8-sig")
-
     print(f"zs::elapsed {t()-t0:.1f}s::{pctrng=},{intp=}")
     return f
 
@@ -172,12 +161,9 @@ def zs(f:pd.DataFrame,
 def rng(f:pd.DataFrame,i:str,
     rng=(.05,5),test=False)->pd.DataFrame:
     t0=t()
-
     if not i in f.columns:
         raise NameError(f"{i} does not exist")
-    
     col=f"{i}lzp"
-
     if test:
         rng=np.delete(
             np.round(np.flip(
@@ -187,32 +173,34 @@ def rng(f:pd.DataFrame,i:str,
         rng=np.round(np.flip(
             np.percentile(f[col].dropna(),(1,15,35,100))),
             2)
-    
     f.loc[:,f"{col}rng"]=None
     for q in range(len(rng)):
         f.loc[:,f"{col}rng"]=np.where(
             (~pd.isna(f[col])) & (f[col]<=rng[q]),
             rng[q],f[f"{col}rng"])
-    
     f_=f.loc[:,f"{col}rng"].astype("category").copy()
     f.update(f_)
-
     print(f"prng::elapsed {t()-t0:.1f}s::{rng}")
     return f
 
 
-def locate(f:pd.DataFrame,i:str,
-    v:float,test=True):
+def tf():
+    pd.DataFrame.shift()
+    ...
+
+
+def locate(f:pd.DataFrame,i:str,v:float,
+    test=True):
     rowidx=np.abs(f[f"{i}"]-v).argmin()
     colidx=f.columns.get_indexer([f"{i}"])[0]
     q=f.iloc[rowidx,colidx:colidx+5]
     print(f"{q[4]*100:.3f}%")
     if test:
-        print(f"({rowidx=}, {colidx=}~)")
+        print(f"({rowidx},{colidx})")
     return q
 
 
-def hm(f:pd.DataFrame,
+def hm(f,
     mm=(-1,1),ax=None,cbar=False,title=None):
     if title is None:
         title=f"{', '.join(f.columns)}"
@@ -231,31 +219,51 @@ def hm(f:pd.DataFrame,
 def hm_(f):
     if len(f.columns)>20:
         raise ValueError(f"{len(f.columns)} columns are too much")
-    sns.set_theme("poster","whitegrid","deep","monospace",
-        font_scale=0.4,
-        rc={"lines.linestyle":"-"})
     fg,ax=plt.subplots(1,3,figsize=(24,12))
     hm(f,
     title=f"",ax=ax[0]),ax[0].title.set_text("org")
     hm(f.dropna(),
     title=f"",ax=ax[1]),ax[1].title.set_text("dropna")
-    hm(f.interpolate("time").dropna(),
-    title=f"",ax=ax[2]),ax[2].title.set_text("intp, dropna")
+    hm(f.interpolate("time"),
+    title=f"",ax=ax[2]),ax[2].title.set_text("intp")
 
 
-def regr_rfr(x,y,s=0.2,v=False,gs_=True):
-    x,x_,y,y_=tts(x,y,test_size=s)
-    r=rfr(n_jobs=-1,random_state=5,verbose=1)
-    r.fit(x,y)
-    y__=r.predict(x_)
-    print(f"r2::{r.score(x_,y_)}")
-    if v:
-        plt.figure(figsize=(15,8))
-        plt.plot(np.asarray(y_),label="real")
-        plt.plot(np.asarray(y__),label="intp")
-        plt.legend(prop={"family":"monospace"})
-        plt.grid(visible=True)
-    if gs_:
+def pp(f,
+    vars=None,l=False,hue=None):
+    (sns.pairplot(data=f,vars=vars,hue=hue,
+        dropna=False,kind="scatter",diag_kind="hist")
+        .map_diag(sns.histplot,log_scale=l,
+        multiple="stack",element="step"))
+
+
+def rp(f,x,y,
+    hue=None,size=None,sizes=(20,200)):
+    sns.relplot(data=f,x=x,y=y,hue=hue,size=size,sizes=sizes)
+
+
+def regr_(x,y,
+    s=0.2,v=False,test=False,load=False,save=True):
+    if test:
+        x,x_,y,y_=tts(x,y,test_size=s)
+        # x=["10yt","pce","ffr","wti","ng","zs","hg"],y=["5yi"]
+        r0=lr(n_jobs=-1)
+        r0.fit(x,y)
+        r1=rfr(n_jobs=-1,random_state=5,verbose=1)
+        r1.fit(x,y)
+        print(f"r2::r1 {r0.score(x_,y_)}, r2 {r1.score(x_,y_)}")
+        if v:
+            r0_pred,r1_pred=[q.pred(x_) for q in (r0,r1)]
+            plt.figure(figsize=(15,8))
+            plt.plot(np.asarray(y_),label="org")
+            plt.plot(np.asarray(r0_pred),label="r0_pred")
+            plt.plot(np.asarray(r1_pred),label="r1_pred")
+            plt.legend(prop={"family":"monospace"})
+            plt.grid(visible=True)
+            plt.show(block=True)
+        return r0,r1
+    if load:
+        return joblib.load(f"{PATH}da_regr")
+    else:
         params={
             "n_estimators":[20,40,80,100],
             "max_features":[a for a in np.arange(1,x.shape[1])],
@@ -264,21 +272,12 @@ def regr_rfr(x,y,s=0.2,v=False,gs_=True):
             "n_jobs":[1],
             "random_state":[0]
         }
-        rslt=gs(rfr(),params,cv=3,n_jobs=-1,verbose=3)
-        rslt.fit(x,y)
-        return [x,x_,y,y_,rslt]
-# rslt=regr_(f_[x__],f_[y__[0]])
-
-
-def regr_lin(x,y,s):
-    f__=pd.read_csv("c:/code/fx.csv") 
-    x__=["10yt","pce","ffr","wti","ng","zs","hg"]
-    y__=["5yi"]
-    x,x_,y,y_=tts(f__[x__],f__[y__])
-    r=lr(n_jobs=1)
-    r.fit(x,y)
-    r.coef_
-    r.score(x,y)
+        r=gs(rfr(),params,cv=3,n_jobs=-1,verbose=3)
+        r.fit(x,y)
+        print(f"r2::r {r.score(x_,y_)}")
+    if save:
+        joblib.dump(r,f"{PATH}da_regr")
+    return r
 
 
 def exec(i,local=False,roll=1,intp=False):
