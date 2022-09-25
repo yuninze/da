@@ -19,26 +19,30 @@ from sklearn.model_selection import train_test_split as tts,GridSearchCV as gs
 
 BD=251
 PATH="c:/code/"
+PAL="bright"
 int={
-    "cys":"BAMLH0A0HYM2",
-    "5yi":"T5YIE",
-    "pce":"PCETRIM12M159SFRBDAL",
-    "10yt":"DGS10",
+    "cb":"BAMLH0A0HYM2",
+    "ie":"T5YIE",
+    "ce":"PCETRIM12M159SFRBDAL",
+    "yt":"DGS30",
+    "ys":"T10Y2Y",
     "ng":"DHHNGSP",
-    "wti":"DCOILWTICO",
-    "ffr":"DFF",
+    "cl":"DCOILWTICO",
+    "fr":"DFF",
+    "nk":"NIKKEI225"
 }
 ext={
     "zs":"https://www.investing.com/commodities/us-soybeans-historical-data",
     "zc":"https://www.investing.com/commodities/us-corn-historical-data",
     "hg":"https://www.investing.com/commodities/copper-historical-data",
     "ng":"https://www.investing.com/commodities/natural-gas-historical-data",
-    "wti":"https://www.investing.com/commodities/crude-oil-historical-data",
-    "hsi":"https://www.investing.com/indices/hang-sen-40-historical-data",
+    "cl":"https://www.investing.com/commodities/crude-oil-historical-data",
+    "hs":"https://www.investing.com/indices/hang-sen-40-historical-data",
+    "tp":"https://www.investing.com/indices/topix-historical-data",
 }
 
 
-sns.set_theme(style="whitegrid",palette="bright",font="monospace",rc={"lines.linestyle":"-"})
+sns.set_theme(style="whitegrid",palette=PAL,font="monospace",rc={"lines.linestyle":"-"})
 pd.options.display.min_rows=6
 pd.options.display.float_format=lambda q:f"{q:.5f}"
 
@@ -77,9 +81,8 @@ def upd(url:str,i:str):
     naiyou=naiyou.find_all("tr",class_="datatable_row__2vgJl") # trs iter
     cache=[]
     for a in range(len(naiyou)): # each tr
-        s=2 if a==0 else 1
         date=naiyou[a].select("time")[0]["datetime"]
-        val =naiyou[a].select("td")[s].text
+        val =naiyou[a].select("td")[1].text
         cache.append((date,val))
     s=pd.DataFrame(cache,columns=["date",f"{i}"])
     s["date"]=pd.to_datetime(s["date"])
@@ -231,7 +234,7 @@ def hm_(f):
 def pp(f,
     vars=None,l=False,hue=None):
     (sns.pairplot(data=f,vars=vars,hue=hue,
-        dropna=False,kind="scatter",diag_kind="hist")
+        dropna=False,kind="scatter",diag_kind="hist",palette=PAL)
         .map_diag(sns.histplot,log_scale=l,
         multiple="stack",element="step"))
 
