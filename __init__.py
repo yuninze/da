@@ -1,3 +1,10 @@
+from itertools import product
+from glob import glob
+from time import time
+from tqdm import tqdm
+from bs4 import BeautifulSoup as bs
+from full_fred.fred import Fred
+from sklearn.impute import KNNImputer
 import os
 import requests
 import numpy as np
@@ -6,26 +13,16 @@ import scipy.stats
 import scipy.signal
 import matplotlib.pyplot as plt
 import seaborn as sns
-import joblib
-
-from glob import glob
-from time import time as t
-from bs4 import BeautifulSoup as bs
-from full_fred.fred import Fred
-
-from sklearn.linear_model import LinearRegression as lr
-from sklearn.ensemble import RandomForestRegressor as rfr
-from sklearn.model_selection import train_test_split as tts,GridSearchCV as gs
 
 
 BD=251
 PATH="c:/code/"
 P="bright"
-col=["asset","date","price","latency"]
 int={
 "cb":"BAMLH0A0HYM2",
 "fs":"STLFSI3",
 "ie":"T5YIE",
+"ic":"ICSA",
 "ce":"PCETRIM12M159SFRBDAL",
 "yt":"DGS30",
 "ys":"T10Y2Y",
@@ -88,7 +85,7 @@ def upd(url:str,i:str):
 
 def getdata(
     local=True,update=True,roll=1)->pd.DataFrame:
-    t0=t()
+    t0=time()
     if local:
         f=pd.read_csv(f"{PATH}data0.csv",
             index_col="date",
@@ -111,28 +108,32 @@ def getdata(
         f=pd.concat(fs.values(),axis=1)
         f.to_csv(f"{PATH}data0.csv",encoding="utf-8-sig")
     if update:
-        [f.update(upd(ext[i],i)) for i in ext]
+        [f.update(upd(ext[i],i)) for i in tqdm(ext,desc="upd")]
     f=f.apply(pd.to_numeric,errors="coerce")
     if roll!=1:
             f=f.rolling(roll,min_periods=roll//2).mean()
             print(f"rolled::{roll//2}")
-    print(f"getdata::elapsed {t()-t0:.1f}s::{local=},{update=},{roll=}")
+    print(f"getdata::elapsed {time()-t0:.1f}s::{local=},{update=},{roll=}")
     return f
 
 
+def impt_(f:pd.DataFrame,x:list,
+    n=14)->pd.DataFrame:
+    return (pd.DataFrame(
+        KNNImputer(n_neighbors=n,weights="distance").fit_transform(f.loc[:,x]),
+        index=f.index,columns=x))
+
+
 def zs(f:pd.DataFrame,
-    pctrng=(0.1,99.9),intp=False)->pd.DataFrame:
-    t0=t()
+    pctrng=(0.1,99.9),intp="intp",save=False)->pd.DataFrame:
+    t0=time()
+    if intp=="intp":
+        f=f.interpolate("index")
+    elif intp=="impt":
+        f=impt_(f,f.columns)
     fcache=[]
-    for i in f.columns:
-        if intp:
-            q=(f[i]
-            .interpolate("cubic")
-            .ffill()
-            .dropna())
-        else:
-            q=(f[i]
-            .dropna())
+    for i in tqdm(f.columns,desc="z-score"):
+        q=f[i].dropna()
         mm=np.percentile(q,pctrng)
         q[(q<=mm[0])|(q>=mm[1])]=np.nan
         q=q.dropna()
@@ -149,16 +150,16 @@ def zs(f:pd.DataFrame,
             .set_axis([f"{i}",f"{i}nz",f"{i}lz",f"{i}nzp",f"{i}lzp"],
                 axis=1))
         fcache.append(w)
-        print(f"zs::col::{i}")
     f=full_range_idx(f).join(pd.concat(fcache,axis=1),how="left")
-    f.to_csv(f"{PATH}data1.csv",encoding="utf-8-sig")
-    print(f"zs::elapsed {t()-t0:.1f}s::{pctrng=},{intp=}")
+    if save:
+        f.to_csv(f"{PATH}data1.csv",encoding="utf-8-sig")
+    print(f"zs::elapsed {time()-t0:.1f}s::{pctrng=},{intp=}")
     return f
 
 
 def rng(f:pd.DataFrame,i:str,
     rng=(.05,5),test=False)->pd.DataFrame:
-    t0=t()
+    t0=time()
     if not i in f.columns:
         raise NameError(f"{i} does not exist")
     col=f"{i}lzp"
@@ -172,13 +173,13 @@ def rng(f:pd.DataFrame,i:str,
             np.percentile(f[col].dropna(),(1,15,35,100))),
             2)
     f.loc[:,f"{col}rng"]=None
-    for q in range(len(rng)):
+    for q in tqdm(range(len(rng)),desc=f"ranging {i}"):
         f.loc[:,f"{col}rng"]=np.where(
             (~pd.isna(f[col])) & (f[col]<=rng[q]),
             rng[q],f[f"{col}rng"])
     f_=f.loc[:,f"{col}rng"].astype("category").copy()
     f.update(f_)
-    print(f"prng::elapsed {t()-t0:.1f}s::{rng}")
+    print(f"prng::elapsed {time()-t0:.1f}s::{rng}")
     return f
 
 
@@ -194,27 +195,48 @@ def l_(f:pd.DataFrame,i:str,v:float,
     return q.copy()
 
 
-def xxx(f:pd.DataFrame,x:str,y:str):
-    f=f[[x,y]]
-    rowmax=f.shape[0]
-    rowidx=np.min(f.count()[x],f.count()[y])
-    return f[rowmax-rowidx:].interpolate("index")
+def cx_(f:pd.DataFrame,x:str,y:str):
+    f=f[[x,y]].copy()
+    rowidx=np.amin((f.count()[x],f.count()[y]))
+    return f[f.shape[0]-rowidx:].interpolate("index")
 
 
-def xcr(f:pd.DataFrame,x:str,y:str,d,normed=True,test=False):
-    f=xxx(f,x,y)
-    if f.shape[0]<BD*10:
-        raise UserWarning(f"{f.shape[0]} rows")
-    fg,ax=plt.subplots(1,2)
-    ac=ax[0].acorr(f[x],
-        detrend=scipy.signal.detrend,maxlags=d)
-    xc=ax[1].xcorr(f[x],f[y],
-        detrend=scipy.signal.detrend,maxlags=d,normed=normed)
-    ac_=ac[0][np.abs(ac[1]).argmax()]
-    xc_=xc[0][np.abs(xc[1]).argmax()]
-    if test:
-        return (ac[0],ac[1]),(xc[0],xc[1])
-    return ac_,xc_
+def cx(f:pd.DataFrame,x:str,y:str,d,
+    normed=True,save=True,test=False):
+    f=cx_(f,x,y)
+    if save:
+        plt.figure(figsize=(18,10))
+        xc=plt.xcorr(f[x],f[y],
+            detrend=scipy.signal.detrend,maxlags=d,normed=normed)
+        plt.suptitle(f"{x},{y},{d}")
+        plt.savefig(f"{x}_{y}_{d}.png")
+        plt.cla()
+        plt.clf()
+        plt.close()
+        idx=np.abs(xc[1]).argmax()
+        return xc[0][idx],xc[1][idx]
+    else:
+        fg,ax=plt.subplots(1,2)
+        ac=ax[0].acorr(f[x],
+            detrend=scipy.signal.detrend,maxlags=d)
+        xc=ax[1].xcorr(f[x],f[y],
+            detrend=scipy.signal.detrend,maxlags=d,normed=normed)
+        fg.suptitle(f"{x},{y},{d}")
+        ac_=ac[0][np.abs(ac[1]).argmax()]
+        xc_=xc[0][np.abs(xc[1]).argmax()]
+        if test:
+            return (ac[0],ac[1]),(xc[0],xc[1])
+        return ac_,xc_
+
+
+def cxr(f:pd.DataFrame,x):
+    cache=[]
+    for col in product(x,x):
+        if not col[0] is col[1]:
+            rslt=cx(f,col[0],col[1],d=350,save=True)
+            cache.append(
+                (col[0],col[1],rslt[0],rslt[1]))
+    return cache
 
 
 # innermost visualisations
@@ -270,11 +292,22 @@ def rp(f,x,y,
     sns.relplot(data=f,x=x,y=y,hue=hue,size=size,sizes=sizes)
 
 
-def regr_(x,y,
+def exec(i,
+    local=False,roll=1,intp=False):
+    f=getdata(local=local,roll=roll)
+    ff=zs(f,intp=intp)
+    fff=rng(ff,i)
+    return f,ff,fff
+
+
+def regr(x,y,
     s=0.2,v=False,test=False,load=False,save=True):
+    import joblib
+    from sklearn.linear_model import LinearRegression as lr
+    from sklearn.ensemble import RandomForestRegressor as rfr
+    from sklearn.model_selection import train_test_split as tts,GridSearchCV as gs
     if test:
         x,x_,y,y_=tts(x,y,test_size=s)
-        # x=["10yt","pce","ffr","wti","ng","zs","hg"],y=["5yi"]
         r0=lr(n_jobs=-1)
         r0.fit(x,y)
         r1=rfr(n_jobs=-1,random_state=5,verbose=1)
@@ -307,11 +340,3 @@ def regr_(x,y,
     if save:
         joblib.dump(r,f"{PATH}da_regr")
     return r
-
-
-def exec(i,
-    local=False,roll=1,intp=False):
-    f=getdata(local=local,roll=roll)
-    ff=zs(f,intp=intp)
-    fff=rng(ff,i)
-    return f,ff,fff
