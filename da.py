@@ -50,7 +50,7 @@ extern={
 "cl":"https://www.investing.com/commodities/crude-oil-historical-data",
 "hs":"https://www.investing.com/indices/hang-sen-40-historical-data",
 }
-rnd=np.random.RandomState(0)
+rnd=np.random.RandomState(0) # time
 sns.set_theme(palette=P,font="monospace",rc={"lines.linestyle":"-"})
 pd.options.display.min_rows=6
 pd.options.display.float_format=lambda q:f"{q:.5f}"
@@ -146,6 +146,7 @@ def zs(f:pd.DataFrame,
             q=f[i].dropna()
         if i=="yt":
             q=dtr(q)
+            print(f"detrended... yt")
         q_=(q-q.min())/(q.max()-q.min())
         lz=pd.DataFrame(scipy.stats.zscore(
             scipy.stats.yeojohnson(q_)[0]),
@@ -178,6 +179,7 @@ def rng(f:pd.DataFrame,i:str,
             np.percentile(f[col].dropna(),(2,15,30,100))),
             2)
     f.loc[:,f"{col}rng"]=None
+    #heaviside
     for q in range(len(rng)):
         f.loc[:,f"{col}rng"]=np.where(
             (~pd.isna(f[col])) & (f[col]<=rng[q]),
@@ -232,13 +234,17 @@ def cx(f:pd.DataFrame,x:str,y:str,d,
         return ac_,xc_
 
 
-def cx_(f:pd.DataFrame,x):
+def cx_(f:pd.DataFrame,x,
+    d=24,freq="m"):
     cache=[]
+    f=f.resample(freq).median().diff().dropna()
     for col in tqdm(list(product(x,x)),desc=f"cx-rel"):
         if not col[0] is col[1]:
-            rslt=cx(f,col[0],col[1],d=350,save=True)
+            rslt=cx(f,
+                col[0],col[1],d=d,save=True)
             cache.append((col[0],col[1],rslt[0],np.round(rslt[1],2)))
-    return cache
+    return (pd.DataFrame(cache,columns=["x","y","dur","coef"])
+            .sort_values(by="coef",ascending=False))
 
 
 def exec(i,
@@ -258,32 +264,27 @@ def impt(f:pd.DataFrame,
 
 
 def regr_(x,y,
-    s=0.2):
+    s=0.2,cv=5):
     xi,xt,yi,yt=train_test_split(x,y,test_size=s)
-    params={
-            "max_depth":
-                [a for a in np.arange(12,24,6)],
-            "min_samples_split":
-                [a for a in np.arange(2,16,2)],
-            "min_samples_leaf":
-                [int(xi.shape[0]*.01*a) for a in np.arange(1,5,1)],
-            "max_leaf_nodes":
-                [None],
+    params={"max_depth":
+                [a for a in np.arange(8,65,8)],
             "n_estimators":
-                [a for a in np.arange(8,32,4)],
+                [a for a in np.arange(8,65,8)],
             "max_features":
                 [a for a in np.arange(
-                int(np.sqrt(xi.shape[1])),xi.shape[1])],
-            "n_jobs":[-1],
-            "random_state":[rnd]
-            }
-    r=GridSearchCV(rfr(),params,cv=5,n_jobs=-1,verbose=3)
+                    int(np.sqrt(x.shape[1])),x.shape[1])],
+            "n_jobs":
+                [-1],
+            "random_state":
+                [rnd]}
+    r=GridSearchCV(rfr(),params,cv=cv,n_jobs=-1,verbose=3)
     r.fit(xi,yi)
     print(f"r2::{r.score(xt,yt)}")
     return r
 
 
-def regr(f:pd.DataFrame):
+def regr(f:pd.DataFrame,
+    cv=5):
     ff=f.copy()
     xo=["cblz","cllz","nglz","zclz","uylz","ualz","ytlz","yslz"]
     xo1=["fslz"]
@@ -300,18 +301,18 @@ def regr(f:pd.DataFrame):
     y0=x__.dropna(subset=["pi"])["pi"]
     x1=x__.dropna(subset=["ci"])[x__.columns[:-2]]
     y1=x__.dropna(subset=["ci"])["ci"]
-    ppi=regr_(x0,y0,0.15)
-    cpi=regr_(x1,y1,0.15)
+    ppi=regr_(x0,y0,cv=cv)
+    cpi=regr_(x1,y1,cv=cv)
     xi0=x__[pd.isna(x__["pi"])].iloc[:,:-2]
     xi1=x__[pd.isna(x__["ci"])].iloc[:,:-2]
-    return {"ppi":[ppi.best_estimator_,
+    return {"ppi":[ppi,
                 xi0.assign(p_pi=ppi.best_estimator_.predict(xi0))],
-            "cpi":[cpi.best_estimator_,
+            "cpi":[cpi,
                 xi1.assign(p_ci=cpi.best_estimator_.predict(xi1))],
             "ppi_rslt":ppi.cv_results_,
             "cpi_rslt":cpi.cv_results_}
 
-
+# innermost visualisations
 def hm(f,
     mm=(-1,1),ax=None,cbar=False,title=None):
     if title is None:
@@ -327,7 +328,6 @@ def hm(f,
         vmin=mm[0],vmax=mm[1],
         annot=True,center=0,square=True,linewidths=.5,fmt=".2f")
 
-
 def hm_(f):
     if len(f.columns)>20:
         q=input(f"{len(f.columns)} columns:: ")
@@ -340,14 +340,12 @@ def hm_(f):
     hm(impt(f,f.columns),
         title=f"",ax=ax[2]),ax[2].title.set_text("impt")
 
-
 def pp(f,
     vars=None,l=False,hue=None):
     (sns.pairplot(data=f,vars=vars,hue=hue,
         dropna=False,kind="scatter",diag_kind="hist",palette=P)
         .map_diag(sns.histplot,log_scale=l,
         multiple="stack",element="step"))
-
 
 def vs(f,x:str,y:str):
     fg,ax=plt.subplots()
@@ -358,7 +356,6 @@ def vs(f,x:str,y:str):
     ax0.set_ylabel(y)
     handles,labels=ax.get_legend_handles_labels()
     fg.legend(handles,(),loc="upper center")
-
 
 def rp(f,x,y,
     hue=None,size=None,sizes=(20,200)):
