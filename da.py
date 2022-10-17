@@ -146,7 +146,6 @@ def zs(f:pd.DataFrame,
             q=f[i].dropna()
         if i=="yt":
             q=dtr(q)
-            print(f"detrended... yt")
         q_=(q-q.min())/(q.max()-q.min())
         lz=pd.DataFrame(scipy.stats.zscore(
             scipy.stats.yeojohnson(q_)[0]),
@@ -199,16 +198,16 @@ def nav(f:pd.DataFrame,i:str,v:float):
 
 
 def ns(f:pd.DataFrame,x:str,y:str):
-    f=f[[x,y]].copy()
+    f=f[[x,y]].dropna()
     rowidx=np.amin((f.count()[x],f.count()[y]))
-    return f[f.shape[0]-rowidx:].interpolate("quadratic")
+    return f[f.shape[0]-rowidx:]
 
 
-def cx(f:pd.DataFrame,x:str,y:str,d,
-    normed=True,save=True,test=False):
+def cx(f:pd.DataFrame,x:str,y:str,
+    d=24,normed=True,save=True,test=False):
     f=ns(f,x,y)
     if save:
-        plt.figure(figsize=(18,10))
+        plt.figure(figsize=(20,12))
         xc=plt.xcorr(f[x],f[y],
             detrend=scipy.signal.detrend,maxlags=d,
             normed=normed)
@@ -236,21 +235,29 @@ def cx(f:pd.DataFrame,x:str,y:str,d,
 
 def cx_(f:pd.DataFrame,x,
     d=24,freq="m"):
+    if not f.columns==x:raise ValueError(f"wrong frame")
+    f=f[x].resample(freq).median().dropna()
     cache=[]
-    f=f.resample(freq).median().diff().dropna()
     for col in tqdm(list(product(x,x)),desc=f"cx-rel"):
         if not col[0] is col[1]:
-            rslt=cx(f,
+            rslt=cx(f[[col[0],col[1]]],
                 col[0],col[1],d=d,save=True)
             cache.append((col[0],col[1],rslt[0],np.round(rslt[1],2)))
     return (pd.DataFrame(cache,columns=["x","y","dur","coef"])
             .sort_values(by="coef",ascending=False))
 
 
+def cx__(f:pd.DataFrame):
+    from statsmodels.tsa.stattools import grangercausalitytests
+    data=f[["yt","fr"]].ffill().diff().dropna()
+    rslt=grangercausalitytests(data,[a for a in np.arange(12,21)])
+    ...
+
+
 def exec(i,
-    local=False,roll=1):
+    local=False,intp=None,roll=1):
     f=getdata(local=local,roll=roll)
-    ff=zs(f)
+    ff=zs(f,intp=intp)
     fff=rng(ff,i)
     return f,ff,fff
 
@@ -263,8 +270,8 @@ def impt(f:pd.DataFrame,
         index=f.index,columns=x))
 
 
-def regr_(x,y,
-    s=0.2,cv=5):
+def regr(x,y,
+    s=0.2,t="l",cv=5):
     xi,xt,yi,yt=train_test_split(x,y,test_size=s)
     params={"max_depth":
                 [a for a in np.arange(8,65,8)],
@@ -283,7 +290,7 @@ def regr_(x,y,
     return r
 
 
-def regr(f:pd.DataFrame,
+def regr_(f:pd.DataFrame,
     cv=5):
     ff=f.copy()
     xo=["cblz","cllz","nglz","zclz","uylz","ualz","ytlz","yslz"]
@@ -301,8 +308,8 @@ def regr(f:pd.DataFrame,
     y0=x__.dropna(subset=["pi"])["pi"]
     x1=x__.dropna(subset=["ci"])[x__.columns[:-2]]
     y1=x__.dropna(subset=["ci"])["ci"]
-    ppi=regr_(x0,y0,cv=cv)
-    cpi=regr_(x1,y1,cv=cv)
+    ppi=regr(x0,y0,cv=cv)
+    cpi=regr(x1,y1,cv=cv)
     xi0=x__[pd.isna(x__["pi"])].iloc[:,:-2]
     xi1=x__[pd.isna(x__["ci"])].iloc[:,:-2]
     return {"ppi":[ppi,
@@ -311,6 +318,7 @@ def regr(f:pd.DataFrame,
                 xi1.assign(p_ci=cpi.best_estimator_.predict(xi1))],
             "ppi_rslt":ppi.cv_results_,
             "cpi_rslt":cpi.cv_results_}
+
 
 # innermost visualisations
 def hm(f,
@@ -328,6 +336,7 @@ def hm(f,
         vmin=mm[0],vmax=mm[1],
         annot=True,center=0,square=True,linewidths=.5,fmt=".2f")
 
+
 def hm_(f):
     if len(f.columns)>20:
         q=input(f"{len(f.columns)} columns:: ")
@@ -340,12 +349,14 @@ def hm_(f):
     hm(impt(f,f.columns),
         title=f"",ax=ax[2]),ax[2].title.set_text("impt")
 
+
 def pp(f,
     vars=None,l=False,hue=None):
     (sns.pairplot(data=f,vars=vars,hue=hue,
         dropna=False,kind="scatter",diag_kind="hist",palette=P)
         .map_diag(sns.histplot,log_scale=l,
         multiple="stack",element="step"))
+
 
 def vs(f,x:str,y:str):
     fg,ax=plt.subplots()
@@ -356,6 +367,7 @@ def vs(f,x:str,y:str):
     ax0.set_ylabel(y)
     handles,labels=ax.get_legend_handles_labels()
     fg.legend(handles,(),loc="upper center")
+
 
 def rp(f,x,y,
     hue=None,size=None,sizes=(20,200)):
