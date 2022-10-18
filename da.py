@@ -51,7 +51,7 @@ extern={
 "hs":"https://www.investing.com/indices/hang-sen-40-historical-data",
 }
 rnd=np.random.RandomState(0) # time
-sns.set_theme(palette=P,font="monospace",rc={"lines.linestyle":"-"})
+sns.set_theme(style="whitegrid",palette=P,font="monospace")
 pd.options.display.min_rows=6
 pd.options.display.float_format=lambda q:f"{q:.5f}"
 
@@ -207,7 +207,7 @@ def cx(f:pd.DataFrame,x:str,y:str,
     d=24,normed=True,save=True,test=False):
     f=ns(f,x,y)
     if save:
-        plt.figure(figsize=(20,12))
+        plt.figure(figsize=(22,14))
         xc=plt.xcorr(f[x],f[y],
             detrend=scipy.signal.detrend,maxlags=d,
             normed=normed)
@@ -234,22 +234,24 @@ def cx(f:pd.DataFrame,x:str,y:str,
 
 
 def cx_(f:pd.DataFrame,x,
-    d=24,freq="m"):
-    if not f.columns==x:raise ValueError(f"wrong frame")
-    f=f[x].resample(freq).median().dropna()
+    d=12):
+    f=f[x]
     cache=[]
     for col in tqdm(list(product(x,x)),desc=f"cx-rel"):
         if not col[0] is col[1]:
             rslt=cx(f[[col[0],col[1]]],
                 col[0],col[1],d=d,save=True)
             cache.append((col[0],col[1],rslt[0],np.round(rslt[1],2)))
-    return (pd.DataFrame(cache,columns=["x","y","dur","coef"])
-            .sort_values(by="coef",ascending=False))
+    rslt=(pd.DataFrame(cache,columns=["x","y","dur","coef"])
+            .sort_values(by="coef",ascending=False)
+            .set_index(keys=["x","y"]))
+    rslt.to_csv(f"{PATH}cxr.csv")
+    return rslt
 
 
 def cx__(f:pd.DataFrame):
     from statsmodels.tsa.stattools import grangercausalitytests
-    data=f[["yt","fr"]].ffill().diff().dropna()
+    data=f[["yt","fr"]].bfill().diff().dropna()
     rslt=grangercausalitytests(data,[a for a in np.arange(12,21)])
     ...
 
@@ -271,7 +273,7 @@ def impt(f:pd.DataFrame,
 
 
 def regr(x,y,
-    s=0.2,t="l",cv=5):
+    s=0.2,cv=5):
     xi,xt,yi,yt=train_test_split(x,y,test_size=s)
     params={"max_depth":
                 [a for a in np.arange(8,65,8)],
@@ -365,8 +367,8 @@ def vs(f,x:str,y:str):
     ax0.plot(f.loc[:,y],label=y,color="blue")
     ax.set_ylabel(x)
     ax0.set_ylabel(y)
-    handles,labels=ax.get_legend_handles_labels()
-    fg.legend(handles,(),loc="upper center")
+    h,l=ax.get_legend_handles_labels()
+    fg.legend(h,(),loc="upper center")
 
 
 def rp(f,x,y,
