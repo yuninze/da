@@ -35,6 +35,7 @@ intern={
 "nk":"NIKKEI225",
 "ci":"CPIAUCSL",
 "pi":"PPIACO",
+"ii":"PCEPI",
 "hi":"CSUSHPISA",
 "ue":"DEXUSEU",
 "uy":"DEXCHUS",
@@ -276,9 +277,9 @@ def regr(x,y,
     s=0.2,cv=5):
     xi,xt,yi,yt=train_test_split(x,y,test_size=s)
     params={"max_depth":
-                [a for a in np.arange(8,65,8)],
+                [a for a in np.arange(8,65,16)],
             "n_estimators":
-                [a for a in np.arange(8,65,8)],
+                [a for a in np.arange(8,65,16)],
             "max_features":
                 [a for a in np.arange(
                     int(np.sqrt(x.shape[1])),x.shape[1])],
@@ -297,29 +298,36 @@ def regr_(f:pd.DataFrame,
     ff=f.copy()
     xo=["cblz","cllz","nglz","zclz","uylz","ualz","ytlz","yslz"]
     xo1=["fslz"]
-    yo=["pi","ci"]
+    yo=["pi","ci","ii"]
     x_=ff.loc[:,xo].copy()
     x_smallest_c=x_[xo].count().index[x_[xo].count().argmin()]
     x_smallest_n=x_[xo].count()[x_[xo].count().argmin()]
     x_=impt(x_.dropna(subset=[x_smallest_c]),x_.columns,10)
-    m0=ff.loc[:,xo1].bfill().dropna(how="all").shift(-7,"D")
+    m0=ff.loc[:,xo1].bfill().dropna(how="all").shift(-5,"D")
     m1=ff.loc[:,yo].bfill().dropna(how="all").shift(-30,"D")
     x__=pd.concat([x_,m0,m1],axis=1).dropna(thresh=6)
     x__.update(x__.fslz.ffill())
-    x0=x__.dropna(subset=["pi"])[x__.columns[:-2]]
+    x0=x__.dropna(subset=["pi"])[x__.columns[:-3]]
     y0=x__.dropna(subset=["pi"])["pi"]
-    x1=x__.dropna(subset=["ci"])[x__.columns[:-2]]
+    x1=x__.dropna(subset=["ci"])[x__.columns[:-3]]
     y1=x__.dropna(subset=["ci"])["ci"]
+    x2=x__.dropna(subset=["ii"])[x__.columns[:-3]]
+    y2=x__.dropna(subset=["ii"])["ii"]
     ppi=regr(x0,y0,cv=cv)
     cpi=regr(x1,y1,cv=cv)
-    xi0=x__[pd.isna(x__["pi"])].iloc[:,:-2]
-    xi1=x__[pd.isna(x__["ci"])].iloc[:,:-2]
+    cei=regr(x2,y2,cv=cv)
+    xi0=x__[pd.isna(x__["pi"])].iloc[:,:-3]
+    xi1=x__[pd.isna(x__["ci"])].iloc[:,:-3]
+    xi2=x__[pd.isna(x__["ii"])].iloc[:,:-3]
     return {"ppi":[ppi,
                 xi0.assign(p_pi=ppi.best_estimator_.predict(xi0))],
             "cpi":[cpi,
                 xi1.assign(p_ci=cpi.best_estimator_.predict(xi1))],
+            "cei":[cei,
+                xi2.assign(p_ii=cei.best_estimator_.predict(xi2))],
             "ppi_rslt":ppi.cv_results_,
-            "cpi_rslt":cpi.cv_results_}
+            "cpi_rslt":cpi.cv_results_,
+            "cei_rslt":cei.cv_results_}
 
 
 # innermost visualisations
