@@ -1,5 +1,4 @@
 import os
-import requests
 import numpy as np
 import pandas as pd
 import scipy.stats
@@ -7,14 +6,15 @@ import scipy.signal
 import matplotlib.pyplot as plt
 import seaborn as sns
 from itertools import product
+from tqdm import tqdm
 from glob import glob
 from time import time
-from tqdm import tqdm
-from bs4 import BeautifulSoup as bs
 from full_fred.fred import Fred
 from sklearn.impute import KNNImputer
 from sklearn.ensemble import RandomForestRegressor as rfr
 from sklearn.model_selection import train_test_split,GridSearchCV
+from selenium import webdriver
+from selenium.webdriver.common.by import By
 
 
 BD=251
@@ -51,7 +51,7 @@ extern={
 "cl":"https://www.investing.com/commodities/crude-oil-historical-data",
 "hs":"https://www.investing.com/indices/hang-sen-40-historical-data",
 }
-rnd=np.random.RandomState(0) # time
+rnd=np.random.RandomState(0)
 sns.set_theme(style="whitegrid",palette=P,font="monospace")
 pd.options.display.min_rows=6
 pd.options.display.float_format=lambda q:f"{q:.5f}"
@@ -77,9 +77,36 @@ def full_range_idx(f:pd.DataFrame):
 
 
 def upd(url:str,i:str):
-    cnxt=bs(requests.get(url).text)
+    options=webdriver.ChromeOptions()
+    options.add_argument("--headless")
+    driver=webdriver.Chrome(options=options)
+    driver.get(url)
+    cache=[]
+    for x in np.arange(1,20,1):
+        date=driver.find_element(By.XPATH,
+        f'''//*[@id="__next"]/div/div/div/div[2]/main/div/'''
+        f'''div[4]/div/div/div[3]/div/table/tbody/tr[{x}]/td[1]/time''').text
+        value=driver.find_element(By.XPATH,
+        f'''//*[@id="__next"]/div/div/div/div[2]/main/div/'''
+        f'''div[4]/div/div/div[3]/div/table/tbody/tr[{x+1}]/td[2]''').text
+        cache.append((date,value))
+    driver.close()
+    driver.quit()
+    s=pd.DataFrame(cache,columns=["date",f"{i}"])
+    s["date"]=pd.to_datetime(s["date"])
+    s=s.set_index("date").iloc[:,0].str.replace(",","")
+    return s
+
+
+def upd_(url:str,i:str):
+    import requests
+    from bs4 import BeautifulSoup as bs
+    ua={"user-agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) "\
+    "AppleWebKit/537.36 (KHTML, like Gecko) "\
+    "Chrome/104.0.0.0 Safari/537.36"}
+    cnxt=bs(requests.get(url,headers=ua).text)
     # bs::parsables
-    cnxt=cnxt.select("tbody")[1]
+    cnxt=cnxt.select("tbody")
     # tbodies[1]
     cnxt=cnxt.find_all("tr",class_="datatable_row__2vgJl")
     # trs iterable
@@ -120,10 +147,11 @@ def getdata(
         f=pd.concat(fs.values(),axis=1)
         f.to_csv(f"{PATH}data0.csv",encoding="utf-8-sig")
     if update:
-        [f.update(upd(extern[i],i)) for i in tqdm(extern,desc="updating")]
+        [f.update(upd(extern[i],i)) for i in extern]
     f=f.apply(pd.to_numeric,errors="coerce")
     if roll!=1:
             f=f.rolling(roll,min_periods=roll//2).median()
+    os.system('cls||clear')
     print(f"getdata:: {time()-t0:.1f}s::{local=},{update=},{roll=}")
     return f
 
@@ -283,10 +311,8 @@ def regr(x,y,
             "max_features":
                 [a for a in np.arange(
                     int(np.sqrt(x.shape[1])),x.shape[1])],
-            "n_jobs":
-                [-1],
-            "random_state":
-                [rnd]}
+            "n_jobs":[-1],
+            "random_state":[rnd]}
     r=GridSearchCV(rfr(),params,cv=cv,n_jobs=-1,verbose=3)
     r.fit(xi,yi)
     print(f"r2::{r.score(xt,yt)}")
