@@ -40,7 +40,8 @@ intern={
 "ue":"DEXUSEU",
 "uy":"DEXCHUS",
 "ua":"DEXUSNZ",
-"uj":"DEXJPUS"
+"uj":"DEXJPUS",
+"fert":"PCU325311325311",
 }
 extern={
 "zs":"https://www.investing.com/commodities/us-soybeans-historical-data",
@@ -330,12 +331,12 @@ def regr(x,y,s=0.2,cv=5):
             "random_state":[rnd]}
     r=GridSearchCV(rfr(),params,cv=cv,n_jobs=-1,verbose=3)
     r.fit(xi,yi)
-    print(f"input::{yi.name}::{r.score(xt,yt)}")
+    print(f"{yi.name}::{r.score(xt,yt)}")
     return r
 
 
 def proc(f:pd.DataFrame,
-        x=["cb","yt","ys","ng","cl","uj","ue","ic"],
+        x=["cb","yt","ys","ng","cl","zc","zw","uj","ue","ic"],
         y=["pi","ci","ii"],
         thresh=6):
     proc_f=f[x].copy()
@@ -352,7 +353,7 @@ def proc(f:pd.DataFrame,
 
 
 def regr_(f:pd.DataFrame,t,
-        x=["cb","yt","ys","ng","cl","uj","ue","ic"],
+        x=["cb","yt","ys","ng","cl","zc","zw","uj","ue","ic"],
         y=["pi","ci","ii"],
         thresh=6,cv=5,test=1):
     f=proc(f,x=x,y=y,thresh=thresh)
