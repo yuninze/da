@@ -35,11 +35,12 @@ intern={
 "nk":"NIKKEI225",
 "ci":"CPIAUCSL",
 "pi":"PPIACO",
-"ii":"PCEPI",
+"ii":"PCEPILFE",
 "hi":"CSUSHPISA",
 "ue":"DEXUSEU",
 "uy":"DEXCHUS",
-"ua":"DEXUSNZ"
+"ua":"DEXUSNZ",
+"uj":"DEXJPUS"
 }
 extern={
 "zs":"https://www.investing.com/commodities/us-soybeans-historical-data",
@@ -50,6 +51,8 @@ extern={
 "ng":"https://www.investing.com/commodities/natural-gas-historical-data",
 "cl":"https://www.investing.com/commodities/crude-oil-historical-data",
 "hs":"https://www.investing.com/indices/hang-sen-40-historical-data",
+"uj":"https://www.investing.com/currencies/usd-jpy-historical-data",
+"ue":"https://www.investing.com/currencies/eur-usd-historical-data"
 }
 rnd=np.random.RandomState(0)
 sns.set_theme(style="whitegrid",palette=P,font="monospace")
@@ -83,13 +86,22 @@ def upd(url:str,i:str):
     driver.get(url)
     cache=[]
     for x in np.arange(1,20,1):
-        date=driver.find_element(By.XPATH,
-        f'''//*[@id="__next"]/div/div/div/div[2]/main/div/'''
-        f'''div[4]/div/div/div[3]/div/table/tbody/tr[{x}]/td[1]/time''').text
-        value=driver.find_element(By.XPATH,
-        f'''//*[@id="__next"]/div/div/div/div[2]/main/div/'''
-        f'''div[4]/div/div/div[3]/div/table/tbody/tr[{x+1}]/td[2]''').text
-        cache.append((date,value))
+        if "currencies" in url:
+            date=driver.find_element(By.XPATH,
+            f'''//*[@id="__next"]/div/div/div/div[2]/main/div/div[4]/'''
+            f'''div/div[1]/div/div[3]/div/table/tbody/tr[{x}]/td[1]/time''').text
+            value=driver.find_element(By.XPATH,
+            f'''//*[@id="__next"]/div/div/div/div[2]/main/div/div[4]/'''
+            f'''div/div[1]/div/div[3]/div/table/tbody/tr[{x+1}]/td[2]''').text
+            cache.append((date,value))
+        else:
+            date=driver.find_element(By.XPATH,
+            f'''//*[@id="__next"]/div/div/div/div[2]/main/div/div[4]/'''
+            f'''div/div/div[3]/div/table/tbody/tr[{x}]/td[1]/time''').text
+            value=driver.find_element(By.XPATH,
+            f'''//*[@id="__next"]/div/div/div/div[2]/main/div/div[4]/'''
+            f'''div/div/div[3]/div/table/tbody/tr[{x+1}]/td[2]''').text
+            cache.append((date,value))
     driver.close()
     driver.quit()
     s=pd.DataFrame(cache,columns=["date",f"{i}"])
@@ -145,15 +157,24 @@ def getdata(
         for q in range(len((fsincsv))):
             fs[f"{fsincsv[q].columns[0]}"]=fsincsv[q]
         f=pd.concat(fs.values(),axis=1)
-        f.to_csv(f"{PATH}data0.csv",encoding="utf-8-sig")
     if update:
         [f.update(upd(extern[i],i)) for i in extern]
-    f=f.apply(pd.to_numeric,errors="coerce")
+        f=f.apply(pd.to_numeric,errors="coerce")
+    if not local:
+        f.to_csv(f"{PATH}data0.csv",encoding="utf-8-sig")
     if roll!=1:
             f=f.rolling(roll,min_periods=roll//2).median()
     os.system('cls||clear')
     print(f"getdata:: {time()-t0:.1f}s::{local=},{update=},{roll=}")
     return f
+
+
+def impt(f:pd.DataFrame,
+        x:list=None,n=10)->pd.DataFrame:
+    if x is None:f=f.columns
+    return (pd.DataFrame(
+        KNNImputer(n_neighbors=n,weights="distance").fit_transform(f[x]),
+        index=f.index,columns=x))
 
 
 def dtr(a,
@@ -165,22 +186,27 @@ def dtr(a,
     return a
 
 
+def mm(a:pd.DataFrame)->pd.DataFrame:
+    return (a-a.min())/(a.max()-a.min())
+
+
 def zs(f:pd.DataFrame,
-    intp=True,save=False)->pd.DataFrame:
+        intp=True,save=False)->pd.DataFrame:
     fcache=[]
+    if intp:
+        q=f.interpolate("quadratic",limit=3)
     for i in tqdm(f.columns,desc="z-score"):
-        if intp:
-            q=f[i].interpolate("quadratic").dropna()
-        elif not intp:
-            q=f[i].dropna()
+        q=f[i].dropna()
         if i=="yt":
             q=dtr(q)
-        q_=(q-q.min())/(q.max()-q.min())
-        lz=pd.DataFrame(scipy.stats.zscore(
+        q_=mm(q)
+        lz=pd.DataFrame(
+            scipy.stats.zscore(
             scipy.stats.yeojohnson(q_)[0]),
             index=q.index)
-        zp=pd.DataFrame(scipy.stats.norm.cdf(
-            lz,loc=np.mean(lz.to_numpy()),scale=np.std(lz)),
+        zp=pd.DataFrame(
+            scipy.stats.norm.cdf(lz,
+            loc=np.mean(lz.to_numpy()),scale=np.std(lz)),
             index=q.index)
         w=(pd.concat([q,lz,zp],axis=1)
             .set_axis([f"{i}",f"{i}lz",f"{i}lzp"],axis=1))
@@ -192,7 +218,7 @@ def zs(f:pd.DataFrame,
 
 
 def rng(f:pd.DataFrame,i:str,
-    rng=(.05,3),test=False)->pd.DataFrame:
+        rng=(.05,3),test=False)->pd.DataFrame:
     f=f.copy()
     if not i in f.columns:
         raise NameError(f"{i} does not exist")
@@ -247,23 +273,22 @@ def cx(f:pd.DataFrame,x:str,y:str,
         plt.close()
         idx=xc[1].argmax()
         return xc[0][idx],xc[1][idx]
-    else:
-        fg,ax=plt.subplots(1,2)
-        ac=ax[0].acorr(f[x],
-            detrend=scipy.signal.detrend,maxlags=d)
-        xc=ax[1].xcorr(f[x],f[y],
-            detrend=scipy.signal.detrend,maxlags=d,
-            normed=normed)
-        fg.suptitle(f"{x},{y},{d}")
-        ac_=ac[0][ac[1].argmax()]
-        xc_=xc[0][xc[1].argmax()]
-        if test:
-            return (ac[0],ac[1]),(xc[0],xc[1])
-        return ac_,xc_
+    fg,ax=plt.subplots(1,2)
+    ac=ax[0].acorr(f[x],
+        detrend=scipy.signal.detrend,maxlags=d)
+    xc=ax[1].xcorr(f[x],f[y],
+        detrend=scipy.signal.detrend,maxlags=d,
+        normed=normed)
+    fg.suptitle(f"{x},{y},{d}")
+    ac_=ac[0][ac[1].argmax()]
+    xc_=xc[0][xc[1].argmax()]
+    if test:
+        return (ac[0],ac[1]),(xc[0],xc[1])
+    return ac_,xc_
 
 
 def cx_(f:pd.DataFrame,x,
-    d=12):
+        d=12):
     f=f[x]
     cache=[]
     for col in tqdm(list(product(x,x)),desc=f"cx-rel"):
@@ -285,24 +310,14 @@ def cx__(f:pd.DataFrame):
     ...
 
 
-def exec(i,
-    local=False,intp=None,roll=1):
-    f=getdata(local=local,roll=roll)
+def exec(i,local=False,intp=None,roll=1,update=True):
+    f=getdata(local=local,roll=roll,update=update)
     ff=zs(f,intp=intp)
     fff=rng(ff,i)
     return f,ff,fff
 
 
-def impt(f:pd.DataFrame,
-    x:list=None,n=10)->pd.DataFrame:
-    if x is None:x=f.columns
-    return (pd.DataFrame(
-        KNNImputer(n_neighbors=n,weights="distance").fit_transform(f.loc[:,x]),
-        index=f.index,columns=x))
-
-
-def regr(x,y,
-    s=0.2,cv=5):
+def regr(x,y,s=0.2,cv=5):
     xi,xt,yi,yt=train_test_split(x,y,test_size=s)
     params={"max_depth":
                 [a for a in np.arange(8,65,16)],
@@ -315,45 +330,50 @@ def regr(x,y,
             "random_state":[rnd]}
     r=GridSearchCV(rfr(),params,cv=cv,n_jobs=-1,verbose=3)
     r.fit(xi,yi)
-    print(f"r2::{r.score(xt,yt)}")
+    print(f"input::{yi.name}::{r.score(xt,yt)}")
     return r
 
 
-def regr_(f:pd.DataFrame,
-    cv=5):
-    ff=f.copy()
-    xo=["cblz","cllz","nglz","zclz","uylz","ualz","ytlz","yslz"]
-    xo1=["fslz"]
-    yo=["pi","ci","ii"]
-    x_=ff.loc[:,xo].copy()
-    x_smallest_c=x_[xo].count().index[x_[xo].count().argmin()]
-    x_smallest_n=x_[xo].count()[x_[xo].count().argmin()]
-    x_=impt(x_.dropna(subset=[x_smallest_c]),x_.columns,10)
-    m0=ff.loc[:,xo1].bfill().dropna(how="all").shift(-5,"D")
-    m1=ff.loc[:,yo].bfill().dropna(how="all").shift(-30,"D")
-    x__=pd.concat([x_,m0,m1],axis=1).dropna(thresh=6)
-    x__.update(x__.fslz.ffill())
-    x0=x__.dropna(subset=["pi"])[x__.columns[:-3]]
-    y0=x__.dropna(subset=["pi"])["pi"]
-    x1=x__.dropna(subset=["ci"])[x__.columns[:-3]]
-    y1=x__.dropna(subset=["ci"])["ci"]
-    x2=x__.dropna(subset=["ii"])[x__.columns[:-3]]
-    y2=x__.dropna(subset=["ii"])["ii"]
-    ppi=regr(x0,y0,cv=cv)
-    cpi=regr(x1,y1,cv=cv)
-    cei=regr(x2,y2,cv=cv)
-    xi0=x__[pd.isna(x__["pi"])].iloc[:,:-3]
-    xi1=x__[pd.isna(x__["ci"])].iloc[:,:-3]
-    xi2=x__[pd.isna(x__["ii"])].iloc[:,:-3]
-    return {"ppi":[ppi,
-                xi0.assign(p_pi=ppi.best_estimator_.predict(xi0))],
-            "cpi":[cpi,
-                xi1.assign(p_ci=cpi.best_estimator_.predict(xi1))],
-            "cei":[cei,
-                xi2.assign(p_ii=cei.best_estimator_.predict(xi2))],
-            "ppi_rslt":ppi.cv_results_,
-            "cpi_rslt":cpi.cv_results_,
-            "cei_rslt":cei.cv_results_}
+def proc(f:pd.DataFrame,
+        x=["cb","yt","ys","ng","cl","uj","ue","ic"],
+        y=["pi","ci","ii"],
+        thresh=6):
+    proc_f=f[x].copy()
+    proc_f.update(mm(proc_f[[q for q in proc_f.columns if q!="ic"]]))
+    proc_f.update(proc_f.ic.dropna().pct_change())
+    proc_f=proc_f.interpolate("quadratic",limit=3).dropna(thresh=thresh)
+    proc_f.update(proc_f.ic.ffill())
+    proc_f=impt(proc_f,x=proc_f.columns,n=15)
+    return (pd.DataFrame(
+        [scipy.stats.yeojohnson(proc_f[q])[0] for q in proc_f.columns],
+            index=proc_f.columns,
+            columns=proc_f.index)
+            .T.join(f[y].shift(-30).bfill()))
+
+
+def regr_(f:pd.DataFrame,t,
+        x=["cb","yt","ys","ng","cl","uj","ue","ic"],
+        y=["pi","ci","ii"],
+        thresh=6,cv=5,test=1):
+    f=proc(f,x=x,y=y,thresh=thresh)
+    x_=x.copy()
+    x_.extend([y for y in y if y!=t])
+    x0=f.dropna(subset=y)[x_]
+    y0=f.dropna(subset=y)[t]
+    x1=f.loc["2022-07":].copy()[x_].ffill()
+    if test:
+        print(f"{os.linesep}==x0==")
+        print(x0)
+        print(f"{os.linesep}==y0::{t}==")
+        print(y0)
+        print(f"{os.linesep}==x1==")
+        print(x1)
+        toi=input(f"{os.linesep}go?")
+        if not toi:
+            return None
+    i=regr(x0,y0,cv=cv)
+    return {f"{t}":[i,x1.assign(i_=i.best_estimator_.predict(x1))],
+            f"{t}_stat":i.cv_results_}
 
 
 # innermost visualisations
