@@ -5,14 +5,18 @@ import scipy.stats
 import scipy.signal
 import matplotlib.pyplot as plt
 import seaborn as sns
+
 from itertools import product
 from tqdm import tqdm
 from glob import glob
 from time import time
 from full_fred.fred import Fred
+
 from sklearn.impute import KNNImputer
+from sklearn.ensemble import GradientBoostingRegressor as gbr
 from sklearn.ensemble import RandomForestRegressor as rfr
 from sklearn.model_selection import train_test_split,GridSearchCV
+
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 
@@ -136,7 +140,7 @@ def upd_(url:str,i:str):
 
 
 def getdata(
-    local=True,update=True,roll=1)->pd.DataFrame:
+    local=True,update=True)->pd.DataFrame:
     t0=time()
     if local:
         f=pd.read_csv(f"{PATH}data0.csv",
@@ -163,10 +167,8 @@ def getdata(
         f=f.apply(pd.to_numeric,errors="coerce")
     if not local:
         f.to_csv(f"{PATH}data0.csv",encoding="utf-8-sig")
-    if roll!=1:
-            f=f.rolling(roll,min_periods=roll//2).median()
     os.system('cls||clear')
-    print(f"getdata:: {time()-t0:.1f}s::{local=},{update=},{roll=}")
+    print(f"getdata:: {time()-t0:.1f}s::{local=},{update=}")
     return f
 
 
@@ -179,7 +181,7 @@ def impt(f:pd.DataFrame,
 
 
 def dtr(a,
-    o:int=3):
+        o:int=3):
     if any(np.isnan(a)):raise TypeError(f"nan in the array")
     x=np.arange(len(a))
     q=np.polyval(np.polyfit(x,a,deg=o),x)
@@ -191,11 +193,8 @@ def mm(a:pd.DataFrame)->pd.DataFrame:
     return (a-a.min())/(a.max()-a.min())
 
 
-def zs(f:pd.DataFrame,
-        intp=True,save=False)->pd.DataFrame:
+def zs(f:pd.DataFrame,save=False)->pd.DataFrame:
     fcache=[]
-    if intp:
-        q=f.interpolate("quadratic",limit=3)
     for i in tqdm(f.columns,desc="z-score"):
         q=f[i].dropna()
         if i=="yt":
@@ -308,31 +307,42 @@ def cx__(f:pd.DataFrame):
     from statsmodels.tsa.stattools import grangercausalitytests
     data=f[["yt","fr"]].bfill().diff().dropna()
     rslt=grangercausalitytests(data,[a for a in np.arange(12,21)])
+    import statsmodels.api
+    statsmodels.api.tsa.stattools.ccf(a0,a1,adjusted=False)
     ...
 
 
-def exec(i,local=False,intp=None,roll=1,update=True):
-    f=getdata(local=local,roll=roll,update=update)
-    ff=zs(f,intp=intp)
-    fff=rng(ff,i)
-    return f,ff,fff
-
-
-def regr(x,y,s=0.2,cv=5):
+def regr(x,y,s=0.2,cv=5,typ="rf"):
     xi,xt,yi,yt=train_test_split(x,y,test_size=s)
-    params={"max_depth":
-                [a for a in np.arange(8,65,16)],
-            "n_estimators":
-                [a for a in np.arange(8,65,16)],
-            "max_features":
-                [a for a in np.arange(
-                    int(np.sqrt(x.shape[1])),x.shape[1])],
-            "n_jobs":[-1],
-            "random_state":[rnd]}
-    r=GridSearchCV(rfr(),params,cv=cv,n_jobs=-1,verbose=3)
-    r.fit(xi,yi)
-    print(f"{yi.name}::{r.score(xt,yt)}")
-    return r
+    if typ=="rf":
+        params={"max_depth":
+                    [a for a in np.arange(8,65,16)],
+                "n_estimators":
+                    [a for a in np.arange(8,65,16)],
+                "max_features":
+                    ["sqrt"],
+                "min_samples_leaf":
+                    [a for a in np.arange(20,61,20)],
+                "n_jobs":[-1],
+                "random_state":[rnd]}
+        regressor=rfr()
+    elif typ=="gb":
+        params={"learning_rate":
+                    [.1,.01,.001,.0001],
+                "max_depth":
+                    [a for a in np.arange(1,8,2)],
+                "n_estimators":
+                    [a for a in np.arange(48,97,16)],
+                "max_features":
+                    ["sqrt"],
+                "min_samples_leaf":
+                    [a for a in np.arange(10,41,10)],
+                "random_state":[rnd]}
+        regressor=gbr()
+    cursor=GridSearchCV(regressor,params,cv=cv,n_jobs=-1,verbose=3)
+    cursor.fit(xi,yi)
+    print(f"{yi.name}::{cursor.score(xt,yt)}")
+    return cursor
 
 
 def proc(f:pd.DataFrame,
@@ -344,15 +354,14 @@ def proc(f:pd.DataFrame,
     proc_f.update(proc_f.ic.dropna().pct_change())
     proc_f=proc_f.interpolate("quadratic",limit=3).dropna(thresh=thresh)
     proc_f.update(proc_f.ic.ffill())
-    proc_f=impt(proc_f,x=proc_f.columns,n=15)
+    proc_f=impt(proc_f,x=proc_f.columns,n=10)
     return (pd.DataFrame(
-        [scipy.stats.yeojohnson(proc_f[q])[0] for q in proc_f.columns],
-            index=proc_f.columns,
-            columns=proc_f.index)
-            .T.join(f[y].shift(-30).bfill()))
+            [scipy.stats.yeojohnson(proc_f[q])[0] for q in proc_f.columns],
+            index=proc_f.columns,columns=proc_f.index)
+            .T.join(f[y].shift(-60).bfill()))
 
 
-def regr_(f:pd.DataFrame,t,
+def regr_(f:pd.DataFrame,t,typ,
         x=["cb","yt","ys","ng","cl","zc","zw","uj","ue","ic"],
         y=["pi","ci","ii"],
         thresh=6,cv=5,test=1):
@@ -372,7 +381,7 @@ def regr_(f:pd.DataFrame,t,
         toi=input(f"{os.linesep}go?")
         if not toi:
             return None
-    i=regr(x0,y0,cv=cv)
+    i=regr(x0,y0,cv=cv,typ=typ)
     return {f"{t}":[i,x1.assign(i_=i.best_estimator_.predict(x1))],
             f"{t}_stat":i.cv_results_}
 
