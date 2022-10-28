@@ -225,19 +225,18 @@ def rng(f:pd.DataFrame,i:str,
     col=f"{i}lzp"
     if test:
         rng=np.delete(
-            np.round(np.flip(
-            np.geomspace(rng[0],1,rng[1])),
-            2),2)
+            np.round(np.flip(np.geomspace(rng[0],1,rng[1])),2),
+            2)
     else:
-        rng=np.round(np.flip(
-            np.percentile(f[col].dropna(),(2,15,30,100))),
+        rng=np.round(np.flip(np.percentile(f[col].dropna(),(2,15,30,100))),
             2)
     f.loc[:,f"{col}rng"]=None
     #heaviside
     for q in range(len(rng)):
         f.loc[:,f"{col}rng"]=np.where(
-            (~pd.isna(f[col])) & (f[col]<=rng[q]),
-            rng[q],f[f"{col}rng"])
+        (~pd.isna(f[col])) & (f[col]<=rng[q]),
+        rng[q],
+        f[f"{col}rng"])
     f_=f.loc[:,f"{col}rng"].astype("category").copy()
     f.update(f_)
     return f
@@ -249,7 +248,7 @@ def nav(f:pd.DataFrame,i:str,v:float):
     q=f.iloc[rowidx,colidx:colidx+3]
     w=q[f"{i}lzp"]
     print(f"{w*100:.2f}%")
-    return q.copy(),(rowidx,colidx)
+    return q,(rowidx,colidx)
 
 
 def ns(f:pd.DataFrame,x:str,y:str):
@@ -259,12 +258,12 @@ def ns(f:pd.DataFrame,x:str,y:str):
 
 
 def cx(f:pd.DataFrame,x:str,y:str,
-    d=24,normed=True,save=True,test=False):
+    d=24,normed=True,save=True,test=False,dtr=None):
     f=ns(f,x,y)
     if save:
         plt.figure(figsize=(22,14))
         xc=plt.xcorr(f[x],f[y],
-            detrend=scipy.signal.detrend,maxlags=d,
+            detrend=dtr,maxlags=d,
             normed=normed)
         plt.suptitle(f"{x},{y},{d}")
         plt.savefig(f"e:/capt/{x}_{y}_{d}.png")
