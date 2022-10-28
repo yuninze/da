@@ -225,7 +225,8 @@ def rng(f:pd.DataFrame,i:str,
     col=f"{i}lzp"
     if test:
         rng=np.delete(
-            np.round(np.flip(np.geomspace(rng[0],1,rng[1])),2),
+            np.round(np.flip(np.geomspace(rng[0],1,rng[1])),
+            2),
             2)
     else:
         rng=np.round(np.flip(np.percentile(f[col].dropna(),(2,15,30,100))),
