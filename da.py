@@ -172,17 +172,15 @@ def getdata(
     return f
 
 
-def impt(f:pd.DataFrame,
-        x:list=None,n=10)->pd.DataFrame:
+def impt(f:pd.DataFrame,x:list=None,n=10)->pd.DataFrame:
     if x is None:f=f.columns
     return (pd.DataFrame(
         KNNImputer(n_neighbors=n,weights="distance").fit_transform(f[x]),
         index=f.index,columns=x))
 
 
-def dtr(a,
-        o:int=3):
-    if any(np.isnan(a)):raise TypeError(f"nan in the array")
+def dtr(a,o:int=3):
+    if any(np.isnan(a)):raise ValueError(f"nan in the array")
     x=np.arange(len(a))
     q=np.polyval(np.polyfit(x,a,deg=o),x)
     a-=q
@@ -194,24 +192,23 @@ def mm(a:pd.DataFrame)->pd.DataFrame:
 
 
 def zs(f:pd.DataFrame,save=False)->pd.DataFrame:
-    fcache=[]
+    fs=[]
+    f=f.interpolate("quadratic",limit=2)
     for i in tqdm(f.columns,desc="z-score"):
         q=f[i].dropna()
-        if i=="yt":
-            q=dtr(q)
-        q_=mm(q)
+        if i=="yt":q=dtr(q)
         lz=pd.DataFrame(
-            scipy.stats.zscore(
-            scipy.stats.yeojohnson(q_)[0]),
+            scipy.stats.yeojohnson(mm(q))[0],
             index=q.index)
-        zp=pd.DataFrame(
+        lzp=pd.DataFrame(
             scipy.stats.norm.cdf(lz,
-            loc=np.mean(lz.to_numpy()),scale=np.std(lz)),
+            loc=lz.median(),
+            scale=lz.std()),
             index=q.index)
-        w=(pd.concat([q,lz,zp],axis=1)
+        w=(pd.concat([q,lz,lzp],axis=1)
             .set_axis([f"{i}",f"{i}lz",f"{i}lzp"],axis=1))
-        fcache.append(w)
-    f=full_range_idx(f).join(pd.concat(fcache,axis=1),how="left")
+        fs.append(w)
+    f=full_range_idx(f).join(pd.concat(fs,axis=1),how="left")
     if save:
         f.to_csv(f"{PATH}data1.csv",encoding="utf-8-sig")
     return f
@@ -232,7 +229,6 @@ def rng(f:pd.DataFrame,i:str,
         rng=np.round(np.flip(np.percentile(f[col].dropna(),(2,15,30,100))),
             2)
     f.loc[:,f"{col}rng"]=None
-    #heaviside
     for q in range(len(rng)):
         f.loc[:,f"{col}rng"]=np.where(
         (~pd.isna(f[col])) & (f[col]<=rng[q]),
@@ -309,7 +305,17 @@ def cx__(f:pd.DataFrame):
     rslt=grangercausalitytests(data,[a for a in np.arange(12,21)])
     import statsmodels.api
     statsmodels.api.tsa.stattools.ccf(a0,a1,adjusted=False)
+    # idx=lag
     ...
+
+
+def dcm(f_):
+    from sklearn.decomposition import PCA
+    f_=f_.dropna()
+    cursor:PCA=PCA()
+    cursor.fit(f_)
+    cursor_components=pd.DataFrame(cursor.components_,columns=f_.columns)
+    return cursor
 
 
 def regr(x,y,s=0.2,cv=5,typ="rf"):
@@ -352,9 +358,9 @@ def proc(f:pd.DataFrame,
     proc_f=f[x].copy()
     proc_f.update(mm(proc_f[[q for q in proc_f.columns if q!="ic"]]))
     proc_f.update(proc_f.ic.dropna().pct_change())
-    proc_f=proc_f.interpolate("quadratic",limit=3).dropna(thresh=thresh)
+    proc_f=proc_f.interpolate("quadratic",limit=2).dropna(thresh=thresh)
     proc_f.update(proc_f.ic.ffill())
-    proc_f=impt(proc_f,x=proc_f.columns,n=10)
+    proc_f=impt(proc_f,x=proc_f.columns,n=14)
     return (pd.DataFrame(
             [scipy.stats.yeojohnson(proc_f[q])[0] for q in proc_f.columns],
             index=proc_f.columns,columns=proc_f.index)
