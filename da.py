@@ -14,7 +14,6 @@ from full_fred.fred import Fred
 
 from sklearn.impute import KNNImputer
 from sklearn.ensemble import GradientBoostingRegressor as gbr
-from sklearn.ensemble import RandomForestRegressor as rfr
 from sklearn.model_selection import train_test_split,GridSearchCV
 
 from selenium import webdriver
@@ -62,6 +61,7 @@ extern={
 rnd=np.random.RandomState(0)
 sns.set_theme(style="whitegrid",palette=P,font="monospace")
 pd.options.display.min_rows=6
+pd.options.display.max_columns=6
 pd.options.display.float_format=lambda q:f"{q:.5f}"
 
 
@@ -139,8 +139,7 @@ def upd_(url:str,i:str):
     return s
 
 
-def getdata(
-    local=True,update=True)->pd.DataFrame:
+def getdata(local=False)->pd.DataFrame:
     t0=time()
     if local:
         f=pd.read_csv(f"{PATH}data0.csv",
@@ -162,20 +161,17 @@ def getdata(
         for q in range(len((fsincsv))):
             fs[f"{fsincsv[q].columns[0]}"]=fsincsv[q]
         f=pd.concat(fs.values(),axis=1)
-    if update:
         [f.update(upd(extern[i],i)) for i in extern]
         f=f.apply(pd.to_numeric,errors="coerce")
-    if not local:
         f.to_csv(f"{PATH}data0.csv",encoding="utf-8-sig")
-    os.system('cls||clear')
-    print(f"getdata:: {time()-t0:.1f}s::{local=},{update=}")
+    print(f"getdata:: {time()-t0:.1f}s::{local=}")
     return f
 
 
 def impt(f:pd.DataFrame,x:list=None,n=10)->pd.DataFrame:
     if x is None:f=f.columns
     return (pd.DataFrame(
-        KNNImputer(n_neighbors=n,weights="distance").fit_transform(f[x]),
+            KNNImputer(n_neighbors=n,weights="distance").fit_transform(f[x]),
         index=f.index,columns=x))
 
 
@@ -193,17 +189,20 @@ def mm(a:pd.DataFrame)->pd.DataFrame:
 
 def zs(f:pd.DataFrame,save=False)->pd.DataFrame:
     fs=[]
-    f=f.interpolate("quadratic",limit=2)
-    for i in tqdm(f.columns,desc="z-score"):
+    products=f.isnull().sum()[f.isnull().sum()<25000].index
+    f=f[products].interpolate("polynomial",order=3,limit=2)
+    for i in f.columns:
         q=f[i].dropna()
-        if i=="yt":q=dtr(q)
+        if i=="yt":
+            q=dtr(q)
         lz=pd.DataFrame(
-            scipy.stats.yeojohnson(mm(q))[0],
+            scipy.stats.zscore(
+                scipy.stats.yeojohnson(q)[0]),
             index=q.index)
         lzp=pd.DataFrame(
-            scipy.stats.norm.cdf(lz,
-            loc=lz.median(),
-            scale=lz.std()),
+                scipy.stats.norm.cdf(lz,
+                    loc=lz.mean(),
+                    scale=lz.std(ddof=1)),
             index=q.index)
         w=(pd.concat([q,lz,lzp],axis=1)
             .set_axis([f"{i}",f"{i}lz",f"{i}lzp"],axis=1))
@@ -255,19 +254,19 @@ def ns(f:pd.DataFrame,x:str,y:str):
 
 
 def cx(f:pd.DataFrame,x:str,y:str,
-    d=24,normed=True,save=True,test=False,dtr=None):
+    d=24,normed=True,save=True,test=True):
     f=ns(f,x,y)
     if save:
         plt.figure(figsize=(22,14))
         xc=plt.xcorr(f[x],f[y],
-            detrend=dtr,maxlags=d,
+            detrend=scipy.signal.detrend,maxlags=d,
             normed=normed)
         plt.suptitle(f"{x},{y},{d}")
         plt.savefig(f"e:/capt/{x}_{y}_{d}.png")
         plt.cla()
         plt.clf()
         plt.close()
-        idx=xc[1].argmax()
+        idx=np.abs(xc[1]).argmax()
         return xc[0][idx],xc[1][idx]
     fg,ax=plt.subplots(1,2)
     ac=ax[0].acorr(f[x],
@@ -276,8 +275,8 @@ def cx(f:pd.DataFrame,x:str,y:str,
         detrend=scipy.signal.detrend,maxlags=d,
         normed=normed)
     fg.suptitle(f"{x},{y},{d}")
-    ac_=ac[0][ac[1].argmax()]
-    xc_=xc[0][xc[1].argmax()]
+    ac_=ac[0][abs(ac[1]).argmax()]
+    xc_=xc[0][abs(xc[1]).argmax()]
     if test:
         return (ac[0],ac[1]),(xc[0],xc[1])
     return ac_,xc_
@@ -294,18 +293,18 @@ def cx_(f:pd.DataFrame,x,
             cache.append((col[0],col[1],rslt[0],np.round(rslt[1],2)))
     rslt=(pd.DataFrame(cache,columns=["x","y","dur","coef"])
             .sort_values(by="coef",ascending=False)
-            .set_index(keys=["x","y"]))
+            .set_index(keys=["x","y"])
+            .sort_index())
     rslt.to_csv(f"{PATH}cxr.csv")
     return rslt
 
 
-def cx__(f:pd.DataFrame):
+def cc(f:pd.DataFrame):
     from statsmodels.tsa.stattools import grangercausalitytests
     data=f[["yt","fr"]].bfill().diff().dropna()
     rslt=grangercausalitytests(data,[a for a in np.arange(12,21)])
     import statsmodels.api
     statsmodels.api.tsa.stattools.ccf(a0,a1,adjusted=False)
-    # idx=lag
     ...
 
 
@@ -318,33 +317,20 @@ def dcm(f_):
     return cursor
 
 
-def regr(x,y,s=0.2,cv=5,typ="rf"):
+def regr(x,y,s=0.2,cv=5):
     xi,xt,yi,yt=train_test_split(x,y,test_size=s)
-    if typ=="rf":
-        params={"max_depth":
-                    [a for a in np.arange(8,65,16)],
-                "n_estimators":
-                    [a for a in np.arange(8,65,16)],
-                "max_features":
-                    ["sqrt"],
-                "min_samples_leaf":
-                    [a for a in np.arange(20,61,20)],
-                "n_jobs":[-1],
-                "random_state":[rnd]}
-        regressor=rfr()
-    elif typ=="gb":
-        params={"learning_rate":
-                    [.1,.01,.001,.0001],
-                "max_depth":
-                    [a for a in np.arange(1,8,2)],
-                "n_estimators":
-                    [a for a in np.arange(48,97,16)],
-                "max_features":
-                    ["sqrt"],
-                "min_samples_leaf":
-                    [a for a in np.arange(10,41,10)],
-                "random_state":[rnd]}
-        regressor=gbr()
+    params={"learning_rate":
+                [.1,.01,.001,.0001],
+            "max_depth":
+                [a for a in np.arange(1,8,2)],
+            "n_estimators":
+                [a for a in np.arange(48,97,16)],
+            "max_features":
+                ["sqrt"],
+            "min_samples_leaf":
+                [a for a in np.arange(10,41,10)],
+            "random_state":[rnd]}
+    regressor=gbr()
     cursor=GridSearchCV(regressor,params,cv=cv,n_jobs=-1,verbose=3)
     cursor.fit(xi,yi)
     print(f"{yi.name}::{cursor.score(xt,yt)}")
@@ -358,20 +344,19 @@ def proc(f:pd.DataFrame,
     proc_f=f[x].copy()
     proc_f.update(mm(proc_f[[q for q in proc_f.columns if q!="ic"]]))
     proc_f.update(proc_f.ic.dropna().pct_change())
-    proc_f=proc_f.interpolate("quadratic",limit=2).dropna(thresh=thresh)
+    proc_f=proc_f.interpolate("quadratic",limit=3).dropna(thresh=thresh)
     proc_f.update(proc_f.ic.ffill())
-    proc_f=impt(proc_f,x=proc_f.columns,n=14)
+    proc_f=impt(proc_f,x=proc_f.columns)
     return (pd.DataFrame(
             [scipy.stats.yeojohnson(proc_f[q])[0] for q in proc_f.columns],
             index=proc_f.columns,columns=proc_f.index)
             .T.join(f[y].shift(-60).bfill()))
 
 
-def regr_(f:pd.DataFrame,t,typ,
+def regr_(f:pd.DataFrame,t,
         x=["cb","yt","ys","ng","cl","zc","zw","uj","ue","ic"],
-        y=["pi","ci","ii"],
-        thresh=6,cv=5,test=1):
-    f=proc(f,x=x,y=y,thresh=thresh)
+        y=["pi","ci","ii"],cv=5,test=1):
+    f=proc(f,x=x,y=y,thresh=int(len(x)*.7))
     x_=x.copy()
     x_.extend([y for y in y if y!=t])
     x0=f.dropna(subset=y)[x_]
@@ -387,7 +372,7 @@ def regr_(f:pd.DataFrame,t,typ,
         toi=input(f"{os.linesep}go?")
         if not toi:
             return None
-    i=regr(x0,y0,cv=cv,typ=typ)
+    i=regr(x0,y0,cv=cv)
     return {f"{t}":[i,x1.assign(i_=i.best_estimator_.predict(x1))],
             f"{t}_stat":i.cv_results_}
 
