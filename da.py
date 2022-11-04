@@ -11,53 +11,51 @@ from tqdm import tqdm
 from glob import glob
 from time import time
 from full_fred.fred import Fred
-
 from sklearn.impute import KNNImputer
 from sklearn.ensemble import GradientBoostingRegressor as gbr
 from sklearn.model_selection import train_test_split,GridSearchCV
-
+from statsmodels.tsa.stattools import grangercausalitytests as gct
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 
 
-BD=251
 PATH="c:/code/"
 P="bright"
-intern={
-"cb":"BAMLH0A0HYM2",
-"fs":"STLFSI3",
-"ie":"T5YIE",
-"ic":"ICSA",
-"pr":"PAYEMS",
-"ce":"PCETRIM12M159SFRBDAL",
-"yt":"DGS30",
-"ys":"T10Y2Y",
-"ng":"DHHNGSP",
-"cl":"DCOILWTICO",
-"fr":"DFF",
-"nk":"NIKKEI225",
-"ci":"CPIAUCSL",
-"pi":"PPIACO",
-"ii":"PCEPILFE",
-"hi":"CSUSHPISA",
-"ue":"DEXUSEU",
-"uy":"DEXCHUS",
-"ua":"DEXUSNZ",
-"uj":"DEXJPUS",
-"fert":"PCU325311325311",
-}
-extern={
-"zs":"https://www.investing.com/commodities/us-soybeans-historical-data",
-"zc":"https://www.investing.com/commodities/us-corn-historical-data",
-"zw":"https://www.investing.com/commodities/us-wheat-historical-data",
-"hg":"https://www.investing.com/commodities/copper-historical-data",
-"si":"https://www.investing.com/commodities/silver-historical-data",
-"ng":"https://www.investing.com/commodities/natural-gas-historical-data",
-"cl":"https://www.investing.com/commodities/crude-oil-historical-data",
-"hs":"https://www.investing.com/indices/hang-sen-40-historical-data",
-"uj":"https://www.investing.com/currencies/usd-jpy-historical-data",
-"ue":"https://www.investing.com/currencies/eur-usd-historical-data"
-}
+
+
+intern={"cb":"BAMLH0A0HYM2",
+        "fs":"STLFSI3",
+        "ie":"T5YIE",
+        "ic":"ICSA",
+        "pr":"PAYEMS",
+        "ce":"PCETRIM12M159SFRBDAL",
+        "yt":"DGS30",
+        "ys":"T10Y2Y",
+        "ng":"DHHNGSP",
+        "cl":"DCOILWTICO",
+        "fr":"DFF",
+        "nk":"NIKKEI225",
+        "ci":"CPIAUCSL",
+        "pi":"PPIACO",
+        "ii":"PCEPILFE",
+        "hi":"CSUSHPISA",
+        "ue":"DEXUSEU",
+        "uy":"DEXCHUS",
+        "ua":"DEXUSNZ",
+        "uj":"DEXJPUS",
+        "fert":"PCU325311325311",}
+extern={"zs":"https://www.investing.com/commodities/us-soybeans-historical-data",
+        "zc":"https://www.investing.com/commodities/us-corn-historical-data",
+        "zw":"https://www.investing.com/commodities/us-wheat-historical-data",
+        "hg":"https://www.investing.com/commodities/copper-historical-data",
+        "si":"https://www.investing.com/commodities/silver-historical-data",
+        "ng":"https://www.investing.com/commodities/natural-gas-historical-data",
+        "cl":"https://www.investing.com/commodities/crude-oil-historical-data",
+        "hs":"https://www.investing.com/indices/hang-sen-40-historical-data",
+        "uj":"https://www.investing.com/currencies/usd-jpy-historical-data",
+        "ue":"https://www.investing.com/currencies/eur-usd-historical-data"}
+
+
 rnd=np.random.RandomState(0)
 sns.set_theme(style="whitegrid",palette=P,font="monospace")
 pd.options.display.min_rows=6
@@ -87,26 +85,34 @@ def full_range_idx(f:pd.DataFrame):
 def upd(url:str,i:str):
     options=webdriver.ChromeOptions()
     options.add_argument("--headless")
+    options.add_argument("--disable-extensions")
     driver=webdriver.Chrome(options=options)
+    driver.implicitly_wait(10)
     driver.get(url)
     cache=[]
-    for x in np.arange(1,20,1):
-        if "currencies" in url:
-            date=driver.find_element(By.XPATH,
-            f'''//*[@id="__next"]/div/div/div/div[2]/main/div/div[4]/'''
-            f'''div/div[1]/div/div[3]/div/table/tbody/tr[{x}]/td[1]/time''').text
-            value=driver.find_element(By.XPATH,
-            f'''//*[@id="__next"]/div/div/div/div[2]/main/div/div[4]/'''
-            f'''div/div[1]/div/div[3]/div/table/tbody/tr[{x+1}]/td[2]''').text
-            cache.append((date,value))
-        else:
-            date=driver.find_element(By.XPATH,
-            f'''//*[@id="__next"]/div/div/div/div[2]/main/div/div[4]/'''
-            f'''div/div/div[3]/div/table/tbody/tr[{x}]/td[1]/time''').text
-            value=driver.find_element(By.XPATH,
-            f'''//*[@id="__next"]/div/div/div/div[2]/main/div/div[4]/'''
-            f'''div/div/div[3]/div/table/tbody/tr[{x+1}]/td[2]''').text
-            cache.append((date,value))
+    try:
+        for x in np.arange(1,21,1):
+            if "currencies" in url:
+                date=driver.find_element(By.XPATH,
+                f'''//*[@id="__next"]/div/div/div/div[2]/main/div/div[4]/'''
+                f'''div/div[1]/div/div[3]/div/table/tbody/tr[{x}]/td[1]/time''').text
+                value=driver.find_element(By.XPATH,
+                f'''//*[@id="__next"]/div/div/div/div[2]/main/div/div[4]/'''
+                f'''div/div[1]/div/div[3]/div/table/tbody/tr[{x+1}]/td[2]''').text
+                cache.append((date,value))
+            else:
+                date=driver.find_element(By.XPATH,
+                f'''//*[@id="__next"]/div/div/div/div[2]/main/div/div[4]/'''
+                f'''div/div/div[3]/div/table/tbody/tr[{x}]/td[1]/time''').text
+                value=driver.find_element(By.XPATH,
+                f'''//*[@id="__next"]/div/div/div/div[2]/main/div/div[4]/'''
+                f'''div/div/div[3]/div/table/tbody/tr[{x+1}]/td[2]''').text
+                cache.append((date,value))
+    except:
+        driver.close()
+        driver.quit()
+        print(f"{url}")
+        return None
     driver.close()
     driver.quit()
     s=pd.DataFrame(cache,columns=["date",f"{i}"])
@@ -259,7 +265,7 @@ def cx(f:pd.DataFrame,x:str,y:str,
     if save:
         plt.figure(figsize=(22,14))
         xc=plt.xcorr(f[x],f[y],
-            detrend=scipy.signal.detrend,maxlags=d,
+            detrend=np.diff,maxlags=d,
             normed=normed)
         plt.suptitle(f"{x},{y},{d}")
         plt.savefig(f"e:/capt/{x}_{y}_{d}.png")
@@ -270,9 +276,9 @@ def cx(f:pd.DataFrame,x:str,y:str,
         return xc[0][idx],xc[1][idx]
     fg,ax=plt.subplots(1,2)
     ac=ax[0].acorr(f[x],
-        detrend=scipy.signal.detrend,maxlags=d)
+        detrend=np.diff,maxlags=d)
     xc=ax[1].xcorr(f[x],f[y],
-        detrend=scipy.signal.detrend,maxlags=d,
+        detrend=np.diff,maxlags=d,
         normed=normed)
     fg.suptitle(f"{x},{y},{d}")
     ac_=ac[0][abs(ac[1]).argmax()]
@@ -299,13 +305,11 @@ def cx_(f:pd.DataFrame,x,
     return rslt
 
 
-def cc(f:pd.DataFrame):
-    from statsmodels.tsa.stattools import grangercausalitytests
-    data=f[["yt","fr"]].bfill().diff().dropna()
-    rslt=grangercausalitytests(data,[a for a in np.arange(12,21)])
-    import statsmodels.api
-    statsmodels.api.tsa.stattools.ccf(a0,a1,adjusted=False)
-    ...
+    var=["ie","cl"]
+    vars=(f[var]
+        .interpolate("polynomial",order=3,limit=2)
+        .resample("10d").mean().diff().dropna().round(4))
+    gct_rslt=gct(vars,5)
 
 
 def dcm(f_):
