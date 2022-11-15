@@ -1,66 +1,54 @@
 import os
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import pandas_datareader as pdd
 import scipy.stats
-import scipy.signal
-import matplotlib.pyplot as plt
 import seaborn as sns
 
 from itertools import product
 from tqdm import tqdm
-from glob import glob
-from time import time
-from full_fred.fred import Fred
+from scipy.signal import detrend
+
 from sklearn.impute import KNNImputer
 from sklearn.ensemble import GradientBoostingRegressor as gbr
-from sklearn.model_selection import train_test_split,GridSearchCV
-from statsmodels.tsa.stattools import grangercausalitytests as gct
-from selenium import webdriver
-from selenium.webdriver.common.by import By
+from sklearn.model_selection import GridSearchCV,train_test_split
 
 
-PATH="c:/code/"
-P="bright"
+rnd=np.random.RandomState(0)
+sns.set_theme(style="whitegrid",palette="bright",font="monospace")
+pd.options.display.min_rows=6
+pd.options.display.max_columns=6
+pd.options.display.precision=5
 
 
-intern={"cb":"BAMLH0A0HYM2",
-        "fs":"STLFSI3",
+intern={"ci":"CPIAUCSL",
+        "pi":"PPIACO",
+        "ii":"PCEPI",
+        "hi":"CSUSHPISA",
+        "cb":"BAMLH0A0HYM2",
         "ie":"T5YIE",
+        "fs":"STLFSI4",
         "ic":"ICSA",
         "pr":"PAYEMS",
-        "ce":"PCETRIM12M159SFRBDAL",
-        "yt":"DGS30",
-        "ys":"T10Y2Y",
+        "ys":"T10Y3M",
         "ng":"DHHNGSP",
         "cl":"DCOILWTICO",
         "fr":"DFF",
         "nk":"NIKKEI225",
-        "ci":"CPIAUCSL",
-        "pi":"PPIACO",
-        "ii":"PCEPILFE",
-        "hi":"CSUSHPISA",
-        "ue":"DEXUSEU",
-        "uy":"DEXCHUS",
-        "ua":"DEXUSNZ",
-        "uj":"DEXJPUS",
         "fert":"PCU325311325311",}
-extern={"zs":"https://www.investing.com/commodities/us-soybeans-historical-data",
-        "zc":"https://www.investing.com/commodities/us-corn-historical-data",
-        "zw":"https://www.investing.com/commodities/us-wheat-historical-data",
-        "hg":"https://www.investing.com/commodities/copper-historical-data",
-        "si":"https://www.investing.com/commodities/silver-historical-data",
-        "ng":"https://www.investing.com/commodities/natural-gas-historical-data",
-        "cl":"https://www.investing.com/commodities/crude-oil-historical-data",
-        "hs":"https://www.investing.com/indices/hang-sen-40-historical-data",
-        "uj":"https://www.investing.com/currencies/usd-jpy-historical-data",
-        "ue":"https://www.investing.com/currencies/eur-usd-historical-data"}
-
-
-rnd=np.random.RandomState(0)
-sns.set_theme(style="whitegrid",palette=P,font="monospace")
-pd.options.display.min_rows=6
-pd.options.display.max_columns=6
-pd.options.display.float_format=lambda q:f"{q:.5f}"
+extern={"zs":"ZS=F",
+        "zc":"ZC=F",
+        "zw":"ZW=F",
+        "hg":"HG=F",
+        "si":"SI=F",
+        "ng":"NG=F",
+        "cl":"CL=F",
+        "uj":"JPY=X",
+        "uy":"CNY=X",
+        "ue":"EURUSD=X",
+        "hs":"^HSI",
+        "yt":"^TYX",}
 
 
 def apnd(path:str)->pd.DataFrame:
@@ -70,153 +58,86 @@ def apnd(path:str)->pd.DataFrame:
          os.scandir(path) if ".csv" in q.name],axis=0)
 
 
-def mon(f:pd.DataFrame,start,stop)->np.ndarray:
-    return np.asarray(
-        sum([f.index.month==q for q in np.arange(start,stop,1)]),
-        dtype="bool")
+def index_full_range(f:pd.DataFrame):
+    return pd.DataFrame(
+        index=pd.date_range(f.index.min(),f.index.max(),freq="D"))
 
 
-def full_range_idx(f:pd.DataFrame):
-    return (pd.DataFrame(
-        pd.date_range(f.index.min(),f.index.max()),
-        columns=["date"]).set_index("date"))
+def getdata(days_visit=80):
+    f=pd.read_csv("c:/code/f.csv",
+        index_col="date",
+        converters={"date":pd.to_datetime})
 
+    renew_data_start=f.index.max()-pd.Timedelta(days=days_visit)
 
-def upd(url:str,i:str):
-    options=webdriver.ChromeOptions()
-    options.add_argument("--headless")
-    options.add_argument("--disable-extensions")
-    driver=webdriver.Chrome(options=options)
-    driver.implicitly_wait(10)
-    driver.get(url)
-    cache=[]
-    try:
-        for x in np.arange(1,21,1):
-            if "currencies" in url:
-                date=driver.find_element(By.XPATH,
-                f'''//*[@id="__next"]/div/div/div/div[2]/main/div/div[4]/'''
-                f'''div/div[1]/div/div[3]/div/table/tbody/tr[{x}]/td[1]/time''').text
-                value=driver.find_element(By.XPATH,
-                f'''//*[@id="__next"]/div/div/div/div[2]/main/div/div[4]/'''
-                f'''div/div[1]/div/div[3]/div/table/tbody/tr[{x+1}]/td[2]''').text
-                cache.append((date,value))
-            else:
-                date=driver.find_element(By.XPATH,
-                f'''//*[@id="__next"]/div/div/div/div[2]/main/div/div[4]/'''
-                f'''div/div/div[3]/div/table/tbody/tr[{x}]/td[1]/time''').text
-                value=driver.find_element(By.XPATH,
-                f'''//*[@id="__next"]/div/div/div/div[2]/main/div/div[4]/'''
-                f'''div/div/div[3]/div/table/tbody/tr[{x+1}]/td[2]''').text
-                cache.append((date,value))
-    except:
-        driver.close()
-        driver.quit()
-        print(f"{url}")
-        return None
-    driver.close()
-    driver.quit()
-    s=pd.DataFrame(cache,columns=["date",f"{i}"])
-    s["date"]=pd.to_datetime(s["date"])
-    s=s.set_index("date").iloc[:,0].str.replace(",","")
-    return s
+    renew_ids_fred=list(set(intern.keys())-set(extern.keys()))
+    renew_data_fred:pd.DataFrame=(
+        pdd.DataReader([intern[q] for q in renew_ids_fred],"fred",
+        start=renew_data_start)
+        .set_axis(renew_ids_fred,axis=1))
 
+    renew_ids_yahoo=list(extern.values())
+    renew_data_yahoo:pd.DataFrame=(
+        pdd.DataReader(renew_ids_yahoo,"yahoo",
+        start=renew_data_start)
+        .loc[:,"Close"]
+        .set_axis(list(extern.keys()),axis=1))
 
-def upd_(url:str,i:str):
-    import requests
-    from bs4 import BeautifulSoup as bs
-    ua={"user-agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) "\
-    "AppleWebKit/537.36 (KHTML, like Gecko) "\
-    "Chrome/104.0.0.0 Safari/537.36"}
-    cnxt=bs(requests.get(url,headers=ua).text)
-    # bs::parsables
-    cnxt=cnxt.select("tbody")
-    # tbodies[1]
-    cnxt=cnxt.find_all("tr",class_="datatable_row__2vgJl")
-    # trs iterable
-    cache=[]
-    for a in range(len(cnxt)):
-        # each-tr
-        date=cnxt[a].select("time")[0]["datetime"]
-        val =cnxt[a].select("td")[1].text
-        cache.append((date,val))
-    s=pd.DataFrame(cache,columns=["date",f"{i}"])
-    s["date"]=pd.to_datetime(s["date"])
-    s=s.set_index("date").iloc[:,0].str.replace(",","")
-    return s
+    renew_data=renew_data_fred.combine_first(renew_data_yahoo)
+    f=(f.reindex(
+        pd.date_range(f.index.min(),f.index.max(),freq="D",name="date"))
+        .combine_first(renew_data))
 
-
-def getdata(local=False)->pd.DataFrame:
-    t0=time()
-    if local:
-        f=pd.read_csv(f"{PATH}data0.csv",
-            index_col="date",
-            converters={"date":pd.to_datetime},
-            na_filter=False)
-    else:
-        fred=Fred(f"{PATH}fed")
-        fs={i:fred.get_series_df(intern[i])
-            .loc[:,"date":]
-            .astype({"date":"datetime64[ns]"})
-            .set_index("date")
-            .rename(columns={"value":i}
-            .copy()) for i in intern}
-        fsincsv=[pd.read_csv(q,
-            index_col="date",
-            converters={"date":pd.to_datetime},
-            na_filter=False) for q in sorted(glob(rf"{PATH}da_*.csv"))]
-        for q in range(len((fsincsv))):
-            fs[f"{fsincsv[q].columns[0]}"]=fsincsv[q]
-        f=pd.concat(fs.values(),axis=1)
-        [f.update(upd(extern[i],i)) for i in extern]
-        f=f.apply(pd.to_numeric,errors="coerce")
-        f.to_csv(f"{PATH}data0.csv",encoding="utf-8-sig")
-    print(f"getdata:: {time()-t0:.1f}s::{local=}")
+    print(f[["ie","zs","si","cl","zc","uj"]].tail(5))
+    ask=input("input y to save above::")
+    if ask in ["y","Y"]:
+        f.to_csv("c:/code/f.csv")
     return f
 
 
-def impt(f:pd.DataFrame,x:list=None,n=10)->pd.DataFrame:
-    if x is None:f=f.columns
-    return (pd.DataFrame(
-            KNNImputer(n_neighbors=n,weights="distance").fit_transform(f[x]),
-        index=f.index,columns=x))
+def mon(f:pd.DataFrame,start,stop)->np.ndarray:
+    return np.asarray(
+        sum([f.index.month==q for q in np.arange(start,stop,1)]),
+            dtype="bool")
 
 
-def dtr(a,o:int=3):
-    if any(np.isnan(a)):raise ValueError(f"nan in the array")
+def dtr(arr,o=2):
+    if any(np.isnan(arr)):
+        raise ValueError(f"nan in the array")
+    a=arr.copy()
     x=np.arange(len(a))
     q=np.polyval(np.polyfit(x,a,deg=o),x)
     a-=q
     return a
 
 
-def mm(a:pd.DataFrame)->pd.DataFrame:
-    return (a-a.min())/(a.max()-a.min())
+def arigeo(a)->tuple:
+    a=a.dropna()
+    mean_ari=np.mean(a)
+    mean_geo=np.exp(np.mean(np.log(a)))
+    median_ari=np.median(a)
+    return (mean_ari,mean_geo,median_ari)
 
 
-def zs(f:pd.DataFrame,save=False)->pd.DataFrame:
-    fs=[]
-    products=f.isnull().sum()[f.isnull().sum()<25000].index
-    f=f[products].interpolate("polynomial",order=3,limit=2)
-    for i in f.columns:
-        q=f[i].dropna()
-        if i=="yt":
-            q=dtr(q)
-        lz=pd.DataFrame(
-            scipy.stats.zscore(
-                scipy.stats.yeojohnson(q)[0]),
-            index=q.index)
-        lzp=pd.DataFrame(
-                scipy.stats.norm.cdf(lz,
-                    loc=lz.mean(),
-                    scale=lz.std(ddof=1)),
-            index=q.index)
-        w=(pd.concat([q,lz,lzp],axis=1)
-            .set_axis([f"{i}",f"{i}lz",f"{i}lzp"],axis=1))
-        fs.append(w)
-    f=full_range_idx(f).join(pd.concat(fs,axis=1),how="left")
-    if save:
-        f.to_csv(f"{PATH}data1.csv",encoding="utf-8-sig")
-    return f
+def deflator(inflator):
+    '''results a deflator series from index series'''
+    deflator=inflator.interpolate("pchip",limit=7).ffill()
+    deflator[pd.isna(deflator)]=0
+    return 1-(deflator*.01)
+
+
+def act(t,i,adf=False):
+    '''results an actual adjusted and its occurance'''
+    a      =pd.concat([t,i],axis=1).dropna()
+    a      =a.iloc[:,0]*a.iloc[:,1]
+    a_l    =scipy.stats.yeojohnson(a)[0]
+    a_ls   =scipy.stats.zscore(a_l)
+    a_lsp  =scipy.stats.norm.cdf(a_ls,
+      loc  =a_ls.mean(),
+      scale=a_ls.std(ddof=1))
+    a_lsp_f=pd.Series(a_lsp,index=a.index)
+    return (pd.concat([a,a_lsp_f],axis=1)
+        .set_axis([f"{t.name}",f"{t.name}lp"],axis=1))
 
 
 def rng(f:pd.DataFrame,i:str,
@@ -227,12 +148,11 @@ def rng(f:pd.DataFrame,i:str,
     col=f"{i}lzp"
     if test:
         rng=np.delete(
-            np.round(np.flip(np.geomspace(rng[0],1,rng[1])),
-            2),
-            2)
+            np.round(np.flip(
+            np.geomspace(rng[0],1,rng[1])),2),2)
     else:
-        rng=np.round(np.flip(np.percentile(f[col].dropna(),(2,15,30,100))),
-            2)
+        rng=np.round(np.flip(
+            np.percentile(f[col].dropna(),(2,15,30,100))),2)
     f.loc[:,f"{col}rng"]=None
     for q in range(len(rng)):
         f.loc[:,f"{col}rng"]=np.where(
@@ -247,10 +167,10 @@ def rng(f:pd.DataFrame,i:str,
 def nav(f:pd.DataFrame,i:str,v:float):
     rowidx=np.abs(f[f"{i}"]-v).argmin()
     colidx=f.columns.get_indexer([f"{i}"])[0]
-    q=f.iloc[rowidx,colidx:colidx+3]
-    w=q[f"{i}lzp"]
-    print(f"{w*100:.2f}%")
-    return q,(rowidx,colidx)
+    viewport=f.iloc[rowidx,colidx:colidx+2]
+    cdf_i=viewport[1]
+    print(f"{cdf_i*100:.5f}%")
+    return viewport
 
 
 def ns(f:pd.DataFrame,x:str,y:str):
@@ -260,27 +180,25 @@ def ns(f:pd.DataFrame,x:str,y:str):
 
 
 def cx(f:pd.DataFrame,x:str,y:str,
-    d=24,normed=True,save=True,test=True):
-    f=ns(f,x,y)
+        d=180,normed=True,save=True,detrend=lambda q:q,test=False):
+    f=ns(f,y,x)
     if save:
         plt.figure(figsize=(22,14))
-        xc=plt.xcorr(f[x],f[y],
-            detrend=np.diff,maxlags=d,
-            normed=normed)
-        plt.suptitle(f"{x},{y},{d}")
-        plt.savefig(f"e:/capt/{x}_{y}_{d}.png")
+        xc=plt.xcorr(f[y],f[x],
+            detrend=detrend,maxlags=d,normed=normed)
+        plt.suptitle(f"{y},{x},{d}")
+        plt.savefig(f"e:/capt/{y}_{x}_{d}.png")
         plt.cla()
         plt.clf()
         plt.close()
-        idx=np.abs(xc[1]).argmax()
+        idx=abs(xc[1]).argmax()
         return xc[0][idx],xc[1][idx]
     fg,ax=plt.subplots(1,2)
     ac=ax[0].acorr(f[x],
-        detrend=np.diff,maxlags=d)
-    xc=ax[1].xcorr(f[x],f[y],
-        detrend=np.diff,maxlags=d,
-        normed=normed)
-    fg.suptitle(f"{x},{y},{d}")
+        detrend=detrend,maxlags=d)
+    xc=ax[1].xcorr(f[y],f[x],
+        detrend=detrend,maxlags=d,normed=normed)
+    fg.suptitle(f"{y},{x},{d}")
     ac_=ac[0][abs(ac[1]).argmax()]
     xc_=xc[0][abs(xc[1]).argmax()]
     if test:
@@ -288,8 +206,7 @@ def cx(f:pd.DataFrame,x:str,y:str,
     return ac_,xc_
 
 
-def cx_(f:pd.DataFrame,x,
-        d=12):
+def cx_(f:pd.DataFrame,x,d=12):
     f=f[x]
     cache=[]
     for col in tqdm(list(product(x,x)),desc=f"cx-rel"):
@@ -301,24 +218,13 @@ def cx_(f:pd.DataFrame,x,
             .sort_values(by="coef",ascending=False)
             .set_index(keys=["x","y"])
             .sort_index())
-    rslt.to_csv(f"{PATH}cxr.csv")
     return rslt
 
 
-    var=["ie","cl"]
-    vars=(f[var]
-        .interpolate("polynomial",order=3,limit=2)
-        .resample("10d").mean().diff().dropna().round(4))
-    gct_rslt=gct(vars,5)
-
-
-def dcm(f_):
-    from sklearn.decomposition import PCA
-    f_=f_.dropna()
-    cursor:PCA=PCA()
-    cursor.fit(f_)
-    cursor_components=pd.DataFrame(cursor.components_,columns=f_.columns)
-    return cursor
+def impt(f:pd.DataFrame,x,n=10)->pd.DataFrame:
+    return (pd.DataFrame(
+        KNNImputer(n_neighbors=n,weights="distance").fit_transform(f),
+            index=f.index,columns=x))
 
 
 def regr(x,y,s=0.2,cv=5):
@@ -346,9 +252,8 @@ def proc(f:pd.DataFrame,
         y=["pi","ci","ii"],
         thresh=6):
     proc_f=f[x].copy()
-    proc_f.update(mm(proc_f[[q for q in proc_f.columns if q!="ic"]]))
     proc_f.update(proc_f.ic.dropna().pct_change())
-    proc_f=proc_f.interpolate("quadratic",limit=3).dropna(thresh=thresh)
+    proc_f=proc_f.interpolate("index",limit=2).dropna(thresh=thresh)
     proc_f.update(proc_f.ic.ffill())
     proc_f=impt(proc_f,x=proc_f.columns)
     return (pd.DataFrame(
@@ -360,7 +265,7 @@ def proc(f:pd.DataFrame,
 def regr_(f:pd.DataFrame,t,
         x=["cb","yt","ys","ng","cl","zc","zw","uj","ue","ic"],
         y=["pi","ci","ii"],cv=5,test=1):
-    f=proc(f,x=x,y=y,thresh=int(len(x)*.7))
+    f=proc(f,x=x,y=y,thresh=int(len(x)*.8))
     x_=x.copy()
     x_.extend([y for y in y if y!=t])
     x0=f.dropna(subset=y)[x_]
@@ -386,13 +291,12 @@ def hm(f,
     mm=(-1,1),ax=None,cbar=False,title=None):
     if title is None:
         title=f"{', '.join(f.columns)}"
-    corr=f.corr("spearman")
-    mask=np.triu(np.ones_like(corr,dtype=bool))
+    mask=np.triu(np.ones_like(f,dtype=bool))
     cmap=sns.diverging_palette(240,10,as_cmap=True)
     if ax is None:
-        plt.subplots(figsize=(12,12))
+        plt.subplots(figsize=(22,20))
     plt.title(title)
-    sns.heatmap(corr,
+    sns.heatmap(f,
         mask=mask,cmap=cmap,ax=ax,cbar=cbar,
         vmin=mm[0],vmax=mm[1],
         annot=True,center=0,square=True,linewidths=.5,fmt=".2f")
@@ -404,17 +308,20 @@ def hm_(f):
         if not q:raise ValueError(f"{len(f.columns)} is too much")
     _,ax=plt.subplots(1,3,figsize=(22,16))
     hm(f,
-        title=f"",ax=ax[0]),ax[0].title.set_text("org")
+        title=f"",ax=ax[0])
+    ax[0].title.set_text("org")
     hm(f.dropna(),
-        title=f"",ax=ax[1]),ax[1].title.set_text("dropna")
+        title=f"",ax=ax[1])
+    ax[1].title.set_text("dropna")
     hm(impt(f,f.columns),
-        title=f"",ax=ax[2]),ax[2].title.set_text("impt")
+        title=f"",ax=ax[2])
+    ax[2].title.set_text("impt")
 
 
 def pp(f,
     vars=None,l=False,hue=None):
     (sns.pairplot(data=f,vars=vars,hue=hue,
-        dropna=False,kind="scatter",diag_kind="hist",palette=P)
+        dropna=False,kind="scatter",diag_kind="hist")
         .map_diag(sns.histplot,log_scale=l,
         multiple="stack",element="step"))
 
