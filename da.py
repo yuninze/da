@@ -48,6 +48,7 @@ extern={"zs":"ZS=F",
         "uy":"CNY=X",
         "ue":"EURUSD=X",
         "hs":"^HSI",
+        "vn":"VNM",
         "yt":"^TYX",}
 
 
@@ -63,7 +64,7 @@ def index_full_range(f:pd.DataFrame):
         index=pd.date_range(f.index.min(),f.index.max(),freq="D"))
 
 
-def getdata(days_visit=80):
+def getdata(days_visit=100):
     f=pd.read_csv("c:/code/f.csv",
         index_col="date",
         converters={"date":pd.to_datetime})
