@@ -70,24 +70,26 @@ def getdata(days_visit=100):
         converters={"date":pd.to_datetime})
 
     renew_data_start=f.index.max()-pd.Timedelta(days=days_visit)
+    renew_data_end=np.datetime64("today") # accepts datetime
 
     renew_ids_fred=list(set(intern.keys())-set(extern.keys()))
     renew_data_fred:pd.DataFrame=(
         pdd.DataReader([intern[q] for q in renew_ids_fred],"fred",
-        start=renew_data_start)
+            start=renew_data_start,end=renew_data_end)
         .set_axis(renew_ids_fred,axis=1))
 
     renew_ids_yahoo=list(extern.values())
     renew_data_yahoo:pd.DataFrame=(
         pdd.DataReader(renew_ids_yahoo,"yahoo",
-        start=renew_data_start)
+            start=renew_data_start,end=renew_data_end)
         .loc[:,"Close"]
         .set_axis(list(extern.keys()),axis=1))
 
     renew_data=renew_data_fred.combine_first(renew_data_yahoo)
     f=(f.reindex(
-        pd.date_range(f.index.min(),f.index.max(),freq="D",name="date"))
+        pd.date_range(f.index.min(),f.index.max(),freq="D"))
         .combine_first(renew_data))
+    f.index.name="date"
 
     print(f[["ie","zs","si","cl","zc","uj"]].tail(5))
     ask=input("input y to save above::")
