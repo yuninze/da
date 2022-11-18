@@ -1,32 +1,29 @@
 import os
-import matplotlib.pyplot as plt
+import scipy.stats
 import numpy as np
 import pandas as pd
 import pandas_datareader as pdd
-import scipy.stats
+import matplotlib.pyplot as plt
 import seaborn as sns
 
 from itertools import product
 from tqdm import tqdm
 from scipy.signal import detrend
-
 from sklearn.impute import KNNImputer
-from sklearn.ensemble import GradientBoostingRegressor as gbr
-from sklearn.model_selection import GridSearchCV,train_test_split
 
 
 rnd=np.random.RandomState(0)
-sns.set_theme(style="whitegrid",palette="bright",font="monospace")
-pd.options.display.min_rows=6
+pd.options.display.min_rows=10
 pd.options.display.max_columns=6
 pd.options.display.precision=5
+sns.set_theme(style="whitegrid",palette="bright",font="monospace")
 
 
 intern={"ci":"CPIAUCSL",
         "pi":"PPIACO",
         "ii":"PCEPI",
         "hi":"CSUSHPISA",
-        "cb":"BAMLH0A0HYM2",
+        "cb":"BAMLH0A0HYM2EY",
         "ie":"T5YIE",
         "fs":"STLFSI4",
         "ic":"ICSA",
@@ -49,6 +46,7 @@ extern={"zs":"ZS=F",
         "ue":"EURUSD=X",
         "hs":"^HSI",
         "vn":"VNM",
+        "sp":"^GSPC",
         "yt":"^TYX",}
 
 
@@ -64,13 +62,16 @@ def index_full_range(f:pd.DataFrame):
         index=pd.date_range(f.index.min(),f.index.max(),freq="D"))
 
 
-def getdata(days_visit=100):
+def getdata(days_visit=35,init=False):
     f=pd.read_csv("c:/code/f.csv",
         index_col="date",
         converters={"date":pd.to_datetime})
 
-    renew_data_start=f.index.max()-pd.Timedelta(days=days_visit)
-    renew_data_end=np.datetime64("today") # accepts datetime
+    if init:
+        renew_data_start=pd.Timestamp("1980-01-01")
+    else:
+        renew_data_start=f.index.max()-pd.Timedelta(days=days_visit)
+    renew_data_end=pd.Timestamp("today").floor("d")
 
     renew_ids_fred=list(set(intern.keys())-set(extern.keys()))
     renew_data_fred:pd.DataFrame=(
@@ -91,7 +92,7 @@ def getdata(days_visit=100):
         .combine_first(renew_data))
     f.index.name="date"
 
-    print(f[["ie","zs","si","cl","zc","uj"]].tail(5))
+    print(f[["ie","zs","si","cl","zc","uj","sp"]])
     ask=input("input y to save above::")
     if ask in ["y","Y"]:
         f.to_csv("c:/code/f.csv")
@@ -126,7 +127,9 @@ def deflator(inflator):
     '''results a deflator series from index series'''
     deflator=inflator.interpolate("pchip",limit=7).ffill()
     deflator[pd.isna(deflator)]=0
-    return 1-(deflator*.01)
+    deflator=ci+(1-(deflator*.01))
+    sdgasdfasdgasdgasdg
+    deflator*ci
 
 
 def act(t,i,adf=False):
@@ -136,8 +139,8 @@ def act(t,i,adf=False):
     a_l    =scipy.stats.yeojohnson(a)[0]
     a_ls   =scipy.stats.zscore(a_l)
     a_lsp  =scipy.stats.norm.cdf(a_ls,
-      loc  =a_ls.mean(),
-      scale=a_ls.std(ddof=1))
+     loc  =a_ls.mean(),
+     scale=a_ls.std(ddof=1))
     a_lsp_f=pd.Series(a_lsp,index=a.index)
     return (pd.concat([a,a_lsp_f],axis=1)
         .set_axis([f"{t.name}",f"{t.name}lp"],axis=1))
@@ -182,28 +185,30 @@ def ns(f:pd.DataFrame,x:str,y:str):
     return f[f.shape[0]-rowidx:]
 
 
-def cx(f:pd.DataFrame,x:str,y:str,
-        d=180,normed=True,save=True,detrend=lambda q:q,test=False):
+def cx(f:pd.DataFrame,x:str,y:str,d=180,normed=True,save=True,
+    detrend=lambda q:q,test=False):
     f=ns(f,y,x)
+    freq=fa.index.freq.freqstr
+
     if save:
         plt.figure(figsize=(22,14))
         xc=plt.xcorr(f[y],f[x],
             detrend=detrend,maxlags=d,normed=normed)
-        plt.suptitle(f"{y},{x},{d}")
-        plt.savefig(f"e:/capt/{y}_{x}_{d}.png")
-        plt.cla()
-        plt.clf()
-        plt.close()
+        plt.suptitle(f"{freq} {y},{x},{d}")
+        plt.savefig(f"e:/capt/{freq}_{y}_{x}_{d}.png")
+        plt.cla(),plt.clf(),plt.close()
         idx=abs(xc[1]).argmax()
         return xc[0][idx],xc[1][idx]
+    
     fg,ax=plt.subplots(1,2)
     ac=ax[0].acorr(f[x],
         detrend=detrend,maxlags=d)
     xc=ax[1].xcorr(f[y],f[x],
         detrend=detrend,maxlags=d,normed=normed)
-    fg.suptitle(f"{y},{x},{d}")
+    fg.suptitle(f"{freq}_{freq} {y},{x},{d}")
     ac_=ac[0][abs(ac[1]).argmax()]
     xc_=xc[0][abs(xc[1]).argmax()]
+
     if test:
         return (ac[0],ac[1]),(xc[0],xc[1])
     return ac_,xc_
@@ -228,65 +233,6 @@ def impt(f:pd.DataFrame,x,n=10)->pd.DataFrame:
     return (pd.DataFrame(
         KNNImputer(n_neighbors=n,weights="distance").fit_transform(f),
             index=f.index,columns=x))
-
-
-def regr(x,y,s=0.2,cv=5):
-    xi,xt,yi,yt=train_test_split(x,y,test_size=s)
-    params={"learning_rate":
-                [.1,.01,.001,.0001],
-            "max_depth":
-                [a for a in np.arange(1,8,2)],
-            "n_estimators":
-                [a for a in np.arange(48,97,16)],
-            "max_features":
-                ["sqrt"],
-            "min_samples_leaf":
-                [a for a in np.arange(10,41,10)],
-            "random_state":[rnd]}
-    regressor=gbr()
-    cursor=GridSearchCV(regressor,params,cv=cv,n_jobs=-1,verbose=3)
-    cursor.fit(xi,yi)
-    print(f"{yi.name}::{cursor.score(xt,yt)}")
-    return cursor
-
-
-def proc(f:pd.DataFrame,
-        x=["cb","yt","ys","ng","cl","zc","zw","uj","ue","ic"],
-        y=["pi","ci","ii"],
-        thresh=6):
-    proc_f=f[x].copy()
-    proc_f.update(proc_f.ic.dropna().pct_change())
-    proc_f=proc_f.interpolate("index",limit=2).dropna(thresh=thresh)
-    proc_f.update(proc_f.ic.ffill())
-    proc_f=impt(proc_f,x=proc_f.columns)
-    return (pd.DataFrame(
-            [scipy.stats.yeojohnson(proc_f[q])[0] for q in proc_f.columns],
-            index=proc_f.columns,columns=proc_f.index)
-            .T.join(f[y].shift(-60).bfill()))
-
-
-def regr_(f:pd.DataFrame,t,
-        x=["cb","yt","ys","ng","cl","zc","zw","uj","ue","ic"],
-        y=["pi","ci","ii"],cv=5,test=1):
-    f=proc(f,x=x,y=y,thresh=int(len(x)*.8))
-    x_=x.copy()
-    x_.extend([y for y in y if y!=t])
-    x0=f.dropna(subset=y)[x_]
-    y0=f.dropna(subset=y)[t]
-    x1=f.loc["2022-07":].copy()[x_].ffill()
-    if test:
-        print(f"{os.linesep}==x0==")
-        print(x0)
-        print(f"{os.linesep}==y0::{t}==")
-        print(y0)
-        print(f"{os.linesep}==x1==")
-        print(x1)
-        toi=input(f"{os.linesep}go?")
-        if not toi:
-            return None
-    i=regr(x0,y0,cv=cv)
-    return {f"{t}":[i,x1.assign(i_=i.best_estimator_.predict(x1))],
-            f"{t}_stat":i.cv_results_}
 
 
 # innermost visualisations
