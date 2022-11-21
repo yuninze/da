@@ -8,16 +8,13 @@ import seaborn as sns
 
 from itertools import product
 from tqdm import tqdm
-from scipy.signal import detrend
 from sklearn.impute import KNNImputer
-
 
 rnd=np.random.RandomState(0)
 pd.options.display.min_rows=10
 pd.options.display.max_columns=6
 pd.options.display.precision=5
 sns.set_theme(style="whitegrid",palette="bright",font="monospace")
-
 
 intern={"ci":"CPIAUCSL",
         "pi":"PPIACO",
@@ -116,6 +113,7 @@ def dtr(arr,o=2):
 
 
 def arigeo(a)->tuple:
+    # pp. 479
     a=a.dropna()
     mean_ari=np.mean(a)
     mean_geo=np.exp(np.mean(np.log(a)))
@@ -123,27 +121,57 @@ def arigeo(a)->tuple:
     return (mean_ari,mean_geo,median_ari)
 
 
-def deflator(inflator):
-    '''results a deflator series from index series'''
-    deflator=inflator.interpolate("pchip",limit=7).ffill()
-    deflator[pd.isna(deflator)]=0
-    deflator=ci+(1-(deflator*.01))
-    sdgasdfasdgasdgasdg
-    deflator*ci
+def distrb(f:pd.DataFrame):
+    # pp. 467
+    trs={
+    "noop":lambda x:x,
+    "log" :np.log,
+    "sqrt":np.sqrt,
+    "cbrt":np.cbrt,
+    "inv" :lambda x:-1/x,
+    "sqre":lambda x:x*x,
+    }
+    cont_deta=f.iloc[:,0].dropna()
+    name_deta=cont_deta.name
+    fg,ax=plt.subplots(1,len(trs),figsize=(23,4),layout="constrained")
+    fg.suptitle(f"transformations::{name_deta}")
+    for q in enumerate(trs):
+        ax[q[0]].hist(trs[q[1]](deta),edgecolor="black")
+        ax[q[0]].set_title(q[1])
 
 
-def act(t,i,adf=False):
-    '''results an actual adjusted and its occurance'''
-    a      =pd.concat([t,i],axis=1).dropna()
-    a      =a.iloc[:,0]*a.iloc[:,1]
+def deflator(f):
+    fa=pd.concat([
+        f.ci.ffill(),
+        f.ie.interpolate("linear",limit=7).ffill()
+    ],axis=1).dropna()
+    fb=fa.ci / (100-fa.ie)
+    return fb
+
+
+def act(t,i=None):
+    if not i is None:
+        a  =pd.concat([t,i],axis=1).dropna()
+        a  =a.iloc[:,0] / a.iloc[:,1]
+    else:
+        a  =t.dropna()
     a_l    =scipy.stats.yeojohnson(a)[0]
     a_ls   =scipy.stats.zscore(a_l)
     a_lsp  =scipy.stats.norm.cdf(a_ls,
-     loc  =a_ls.mean(),
-     scale=a_ls.std(ddof=1))
+      loc  =a_ls.mean(),
+      scale=a_ls.std(ddof=1))
     a_lsp_f=pd.Series(a_lsp,index=a.index)
     return (pd.concat([a,a_lsp_f],axis=1)
         .set_axis([f"{t.name}",f"{t.name}lp"],axis=1))
+
+
+def nav(f:pd.DataFrame,i:str,v:float):
+    rowidx=np.abs(f[f"{i}"]-v).argmin()
+    colidx=f.columns.get_indexer([f"{i}"])[0]
+    viewport=f.iloc[rowidx,colidx:colidx+2]
+    cdf_i=viewport[1]
+    print(f"{cdf_i*100:.5f}%")
+    return viewport
 
 
 def rng(f:pd.DataFrame,i:str,
@@ -170,15 +198,6 @@ def rng(f:pd.DataFrame,i:str,
     return f
 
 
-def nav(f:pd.DataFrame,i:str,v:float):
-    rowidx=np.abs(f[f"{i}"]-v).argmin()
-    colidx=f.columns.get_indexer([f"{i}"])[0]
-    viewport=f.iloc[rowidx,colidx:colidx+2]
-    cdf_i=viewport[1]
-    print(f"{cdf_i*100:.5f}%")
-    return viewport
-
-
 def ns(f:pd.DataFrame,x:str,y:str):
     f=f[[x,y]].dropna()
     rowidx=np.amin((f.count()[x],f.count()[y]))
@@ -186,9 +205,11 @@ def ns(f:pd.DataFrame,x:str,y:str):
 
 
 def cx(f:pd.DataFrame,x:str,y:str,d=180,normed=True,save=True,
-    detrend=lambda q:q,test=False):
+    detrend=None,test=False):
     f=ns(f,y,x)
     freq=fa.index.freq.freqstr
+    if detrend is None:
+        detrend=lambda q:q
 
     if save:
         plt.figure(figsize=(22,14))
@@ -208,7 +229,6 @@ def cx(f:pd.DataFrame,x:str,y:str,d=180,normed=True,save=True,
     fg.suptitle(f"{freq}_{freq} {y},{x},{d}")
     ac_=ac[0][abs(ac[1]).argmax()]
     xc_=xc[0][abs(xc[1]).argmax()]
-
     if test:
         return (ac[0],ac[1]),(xc[0],xc[1])
     return ac_,xc_
