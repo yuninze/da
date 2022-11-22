@@ -121,7 +121,7 @@ def arigeo(a)->tuple:
     return (mean_ari,mean_geo,median_ari)
 
 
-def distrb(f:pd.DataFrame):
+def distrb(f:pd.Series):
     # pp. 467
     trs={
     "noop":lambda x:x,
@@ -129,14 +129,16 @@ def distrb(f:pd.DataFrame):
     "sqrt":np.sqrt,
     "cbrt":np.cbrt,
     "inv" :lambda x:-1/x,
-    "sqre":lambda x:x*x,
+    "sq"  :lambda x:x*x,
+    "cb"  :lambda x:x*x*x,
+    "diff":np.diff
     }
-    cont_deta=f.iloc[:,0].dropna()
-    name_deta=cont_deta.name
+    deta_cont=f.dropna()
+    deta_name=deta_cont.name
     fg,ax=plt.subplots(1,len(trs),figsize=(23,4),layout="constrained")
-    fg.suptitle(f"transformations::{name_deta}")
+    fg.suptitle(f"transformations::{deta_name}")
     for q in enumerate(trs):
-        ax[q[0]].hist(trs[q[1]](deta),edgecolor="black")
+        ax[q[0]].hist(trs[q[1]](deta_cont),edgecolor="black")
         ax[q[0]].set_title(q[1])
 
 
@@ -174,6 +176,15 @@ def nav(f:pd.DataFrame,i:str,v:float):
     return viewport
 
 
+def stdevi(f,i,dur=5,start="2022"):
+    data=f[i].dropna().rolling(dur).mean().pct_change().iloc[1:]
+    data_std=np.std(data)
+    fg,ax=plt.subplots(figsize=(12,12))
+    ax.plot(data[f"{start}":],color="black")
+    [ax.axhline(color="red",y=data_std*q) for q in (-2,-1,1,2)]
+    plt.show()
+
+
 def rng(f:pd.DataFrame,i:str,
         rng=(.05,3),test=False)->pd.DataFrame:
     f=f.copy()
@@ -204,8 +215,9 @@ def ns(f:pd.DataFrame,x:str,y:str):
     return f[f.shape[0]-rowidx:]
 
 
-def cx(f:pd.DataFrame,x:str,y:str,d=180,normed=True,save=True,
-    detrend=None,test=False):
+def cx(f:pd.DataFrame,x:str,y:str,d=180,
+       normed=True,save=True,detrend=None,test=False):
+    # pp. 261
     f=ns(f,y,x)
     freq=fa.index.freq.freqstr
     if detrend is None:
