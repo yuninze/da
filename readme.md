@@ -17,4 +17,5 @@
  - Fed Challenge
 
 # 라이센스
- - 스크립트는 모두 wrapper이므로 아무렇게나 써도 됩니다.
+ - 스크립트는 모두 wrapper이므로 아무렇게나 써도 됩니다
+ - 일부 거시지표는 licensed이므로 citation 유의해야 합니다
