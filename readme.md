@@ -13,8 +13,8 @@
  - 빈도 조절 (frequency manipulation, resampling)
 
 # 참고문헌
+ - Chairman Bernanke's Lecture Series (2012)
  - Fred
- - Chairman Bernanke's Lecture Series
  - Fed Challenge
 
 # 라이센스
