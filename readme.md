@@ -1,5 +1,5 @@
 # da
- Python::Miniconda 기반해 몇 가지 거시경제 지표와 금융상품 가격의 관계를 확인하는 utility script입니다
+ - Python::Miniconda 기반해 몇 가지 거시경제 지표와 금융상품 가격의 관계를 확인하는 utility script입니다
 
 # 구현
  - 초회 실행시 f.csv가 필요합니다
