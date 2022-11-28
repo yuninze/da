@@ -2,6 +2,7 @@
  - Python::Miniconda 기반해 몇 가지 거시경제 지표와 금융상품 가격의 관계를 확인하는 유틸리티 스크립트입니다
 
 # 설명
+ - Trading을 위한 스크립트가 아닙니다
  - 초회 실행시 f.csv가 필요합니다
  - Inflation Index (호가 deflator)는 매일 t10yie와 전월 CPI로 계산합니다. t10yie는 "(US10Y) - (Inflation-indexed US10Y)"로 daily 계산 가능합니다
  - 이외 인용하는 거시지표에 대해서는 참고문헌을 숙독하세요
