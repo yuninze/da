@@ -28,9 +28,6 @@ loe.coef_
 loe.score(x0,y0)
 loe.predict(x0)
 
-
-
-
 # gcts
 vars=["fert","cl"]
 gct_tgts=f[vars].resample("30d").mean().diff().dropna()

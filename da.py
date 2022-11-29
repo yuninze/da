@@ -1,11 +1,10 @@
 import os
-import scipy.stats
 import numpy as np
+import scipy.stats
 import pandas as pd
 import pandas_datareader as pdd
 import matplotlib.pyplot as plt
 import seaborn as sns
-
 from itertools import product
 from tqdm import tqdm
 from sklearn.impute import KNNImputer
@@ -21,7 +20,6 @@ intern={"ci":"CPIAUCSL",
         "ii":"PCEPI",
         "hi":"CSUSHPISA",
         "cb":"BAMLH0A0HYM2EY",
-        "ie":"T5YIE",
         "fs":"STLFSI4",
         "ic":"ICSA",
         "pr":"PAYEMS",
@@ -30,7 +28,9 @@ intern={"ci":"CPIAUCSL",
         "cl":"DCOILWTICO",
         "fr":"DFF",
         "nk":"NIKKEI225",
-        "fert":"PCU325311325311",}
+        "fert":"PCU325311325311",
+        "iy":"DFII10",
+        "by":"DGS10"}
 extern={"zs":"ZS=F",
         "zc":"ZC=F",
         "zw":"ZW=F",
@@ -43,8 +43,7 @@ extern={"zs":"ZS=F",
         "ue":"EURUSD=X",
         "hs":"^HSI",
         "vn":"VNM",
-        "sp":"^GSPC",
-        "yt":"^TYX",}
+        "sp":"^GSPC",}
 
 
 def apnd(path:str)->pd.DataFrame:
@@ -59,12 +58,12 @@ def index_full_range(f:pd.DataFrame):
         index=pd.date_range(f.index.min(),f.index.max(),freq="D"))
 
 
-def getdata(days_visit=35,init=False):
+def getdata(days_visit=10):
     f=pd.read_csv("c:/code/f.csv",
         index_col="date",
         converters={"date":pd.to_datetime})
 
-    if init:
+    if days_visit<0:
         renew_data_start=pd.Timestamp("1980-01-01")
     else:
         renew_data_start=f.index.max()-pd.Timedelta(days=days_visit)
@@ -87,9 +86,10 @@ def getdata(days_visit=35,init=False):
     f=(f.reindex(
         pd.date_range(f.index.min(),f.index.max(),freq="D"))
         .combine_first(renew_data))
+    f["ie"]=f["by"]-f["iy"]
     f.index.name="date"
 
-    print(f[["ie","zs","si","cl","zc","uj","sp"]])
+    print(f[["ie","zs","si","zc","uj","sp"]])
     ask=input("input y to save above::")
     if ask in ["y","Y"]:
         f.to_csv("c:/code/f.csv")
@@ -131,8 +131,7 @@ def distrb(f:pd.Series):
     "inv" :lambda x:-1/x,
     "sq"  :lambda x:x*x,
     "cb"  :lambda x:x*x*x,
-    "diff":np.diff
-    }
+    "diff":np.diff}
     deta_cont=f.dropna()
     deta_name=deta_cont.name
     fg,ax=plt.subplots(1,len(trs),figsize=(23,4),layout="constrained")
@@ -147,7 +146,7 @@ def deflator(f):
         f.ci.ffill(),
         f.ie.interpolate("linear",limit=7).ffill()
     ],axis=1).dropna()
-    fb=fa.ci / (100-fa.ie)
+    fb=fa.ci*(1+(fa.ie/100))
     return fb
 
 
@@ -268,12 +267,11 @@ def impt(f:pd.DataFrame,x,n=10)->pd.DataFrame:
 
 
 # innermost visualisations
-def hm(f,
-    mm=(-1,1),ax=None,cbar=False,title=None):
+def hm(f,mm=(-1,1),ax=None,cbar=False,title=None):
     if title is None:
         title=f"{', '.join(f.columns)}"
     mask=np.triu(np.ones_like(f,dtype=bool))
-    cmap=sns.diverging_palette(240,10,as_cmap=True)
+    cmap=sns.diverging_palette(250,10,as_cmap=True)
     if ax is None:
         plt.subplots(figsize=(22,20))
     plt.title(title)
@@ -286,7 +284,8 @@ def hm(f,
 def hm_(f):
     if len(f.columns)>20:
         q=input(f"{len(f.columns)} columns:: ")
-        if not q:raise ValueError(f"{len(f.columns)} is too much")
+        if not q:
+            raise ValueError(f"{len(f.columns)} is too much")
     _,ax=plt.subplots(1,3,figsize=(22,16))
     hm(f,
         title=f"",ax=ax[0])
