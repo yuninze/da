@@ -1,24 +1,47 @@
-# from da import *
-f=getdata(10).interpolate("linear",limit=2)
+f=getdata(5)
 
-# high-order
+# integrity check
+import random
+pp(f,vars=f[random.choices(f.columns,k=4)]),plt.show(0)
+
+# rolling diff std f"unsubstantial"
+stdevi(f.si)
+
+# examplar
+vars=["JoblossClaimsWeekly","CBYieldSpread"]
+fq=f[["ic","cb"]].set_axis(f_vars_name,axis=1)
+fw=fq.resample("3d").mean().dropna()
+fe=np.log(fw)
+fr=scipy.stats.zscore(np.log(fe))
+fr.loc["2020":].plot()
+
+# aft:: pp.428
+from statsmodels.tsa.stattools import adfuller as adf_
+def adf(f):
+    f=f.dropna()
+    enog=adf(f)
+    if enog[1]>.05:
+        print("adf failed")
+    return enog
+
+# low-order uv
 import scipy.stats
 slope,intercept,rv,pv,stderr=scipy.stats.linregress(x0,y0)
 y1=[(slope*x)+intercept for x in x1]
 plt.scatter(x0.values,y0.values)
 plt.plot(x0,y1)
 
+#high-order uv
 hoe=np.poly1d(np.polyfit(x,y,2))
 hoe.c
 hoe.variable
 from sklearn.metrics import r2_score
 r2_score(y0,hoe(x0))
 
-# low-order
+# low-order mv
 from sklearn import linear_model
 fa=fa.interpolate("linear",limit=7).dropna().bfill()[:-2]
 fb=fa.apply(scipy.stats.zscore)
-
 x0=fa[["fr","cb"]]
 y0=fa["yt"]
 
@@ -28,16 +51,17 @@ loe.coef_
 loe.score(x0,y0)
 loe.predict(x0)
 
+# cc
+vars=["fr","iy","hs","si"]
+fa=f[vars].resample("10d").mean().dropna(thresh=int(len(vars)*0.8))
+fb=impt(fa,vars)
+cx_rslt=cx_(fb,vars,d=9)
+
 # gcts
+from statsmodels.tsa.stattools import grangercausalitytests as gct
 vars=["fert","cl"]
-gct_tgts=f[vars].resample("30d").mean().diff().dropna()
+fa=f.fert.resample("10d").mean().ffill().dropna()
+fb=f.cl.resample("10d").mean().dropna()
+fc=pd.concat([fa,fb],axis=1,how="outer")
+gct_tgts=f[vars].resample("10d").mean().diff().dropna()
 gct_rslt=gct(gct_tgts,np.arange(1,11))
-vars=["ic","cb"]
-gct_tgts=f[vars].resample("7d").mean().diff().dropna()
-gct_rslt=gct(gct_tgts,np.arange(1,11))
-
-
-
-
-
-

@@ -142,10 +142,9 @@ def distrb(f:pd.Series):
 
 
 def deflator(f):
-    fa=pd.concat([
-        f.ci.ffill(),
-        f.ie.interpolate("linear",limit=7).ffill()
-    ],axis=1).dropna()
+    fa=pd.concat(
+        [f.ci.ffill(),f.ie.interpolate("linear",limit=5).ffill()],
+            axis=1).dropna()
     fb=fa.ci*(1+(fa.ie/100))
     return fb
 
@@ -156,14 +155,18 @@ def act(t,i=None):
         a  =a.iloc[:,0] / a.iloc[:,1]
     else:
         a  =t.dropna()
-    a_l    =scipy.stats.yeojohnson(a)[0]
+    if not all(np.sign(a)):
+        a_l=scipy.stats.yeojohnson(a)[0]
+    else:
+        a_l=np.log(a)
     a_ls   =scipy.stats.zscore(a_l)
     a_lsp  =scipy.stats.norm.cdf(a_ls,
       loc  =a_ls.mean(),
       scale=a_ls.std(ddof=1))
     a_lsp_f=pd.Series(a_lsp,index=a.index)
-    return (pd.concat([a,a_lsp_f],axis=1)
-        .set_axis([f"{t.name}",f"{t.name}lp"],axis=1))
+    return pd.concat(
+        [a,a_lsp_f],axis=1).set_axis(
+            [f"{t.name}",f"{t.name}lp"],axis=1)
 
 
 def nav(f:pd.DataFrame,i:str,v:float):
@@ -175,7 +178,7 @@ def nav(f:pd.DataFrame,i:str,v:float):
     return viewport
 
 
-def stdevi(f,i,dur=5,start="2022"):
+def roll_pct(f,i,dur=5,start="2022"):
     data=f[i].dropna().rolling(dur).mean().pct_change().iloc[1:]
     data_std=np.std(data)
     fg,ax=plt.subplots(figsize=(12,12))
@@ -221,7 +224,6 @@ def cx(f:pd.DataFrame,x:str,y:str,d=180,
     freq=fa.index.freq.freqstr
     if detrend is None:
         detrend=lambda q:q
-
     if save:
         plt.figure(figsize=(22,14))
         xc=plt.xcorr(f[y],f[x],
@@ -231,7 +233,6 @@ def cx(f:pd.DataFrame,x:str,y:str,d=180,
         plt.cla(),plt.clf(),plt.close()
         idx=abs(xc[1]).argmax()
         return xc[0][idx],xc[1][idx]
-    
     fg,ax=plt.subplots(1,2)
     ac=ax[0].acorr(f[x],
         detrend=detrend,maxlags=d)
@@ -268,6 +269,7 @@ def impt(f:pd.DataFrame,x,n=10)->pd.DataFrame:
 
 # innermost visualisations
 def hm(f,mm=(-1,1),ax=None,cbar=False,title=None):
+    # pp.201
     if title is None:
         title=f"{', '.join(f.columns)}"
     mask=np.triu(np.ones_like(f,dtype=bool))
