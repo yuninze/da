@@ -2,22 +2,31 @@ f=getdata(5)
 
 # integrity check
 import random
-pp(f,vars=f[random.choices(f.columns,k=4)]),plt.show(0)
+pp(f,vars=f[random.choices(f.columns,k=3)]),
+plt.show()
 
-# rolling diff std f"unsubstantial"
-stdevi(f.si)
+# probplot
+scipy.stats.probplot(f.ng.dropna(),dist="norm",plot=plt),
+plt.show()
 
-# examplar
-vars=["JoblossClaimsWeekly","CBYieldSpread"]
-fq=f[["ic","cb"]].set_axis(f_vars_name,axis=1)
-fw=fq.resample("3d").mean().dropna()
-fe=np.log(fw)
-fr=scipy.stats.zscore(np.log(fe))
-fr.loc["2020":].plot()
+# rolling std unsubstantial
+roll_pct(f,"si")
+
+# examplar 0
+freq       ="2d"
+f_cols     =["hs","ic","cb","ys"]
+f_cols_name=["HSI","JC","CBYS","LSYS"]
+f0=f[f_cols]
+f1=f0.resample(freq).mean().dropna()
+f2=f1[["hs","ic","cb"]].apply(lambda q:scipy.stats.zscore(np.log(q)))
+f2["ys"]=scipy.stats.zscore(f1["ys"])
+f3=f2.loc["2007":"2010"].set_axis(f_cols_name,axis=1)
+f3.plot(xlabel=f"{freq}",ylabel=""),
+plt.show()
 
 # aft:: pp.428
 from statsmodels.tsa.stattools import adfuller as adf_
-def adf(f):
+def adf(f)->dict:
     f=f.dropna()
     enog=adf(f)
     if enog[1]>.05:

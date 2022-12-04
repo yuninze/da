@@ -86,12 +86,12 @@ def getdata(days_visit=10):
     f=(f.reindex(
         pd.date_range(f.index.min(),f.index.max(),freq="D"))
         .combine_first(renew_data))
-    f["ie"]=f["by"]-f["iy"]
+    f["ie"]=f["by"]-f["iy"] # daily ie=(basis yield)-(ii yield)
     f.index.name="date"
 
     print(f[["ie","zs","si","zc","uj","sp"]])
     ask=input("input y to save above::")
-    if ask in ["y","Y"]:
+    if not ask in ["n","N"]:
         f.to_csv("c:/code/f.csv")
     return f
 
@@ -103,6 +103,7 @@ def mon(f:pd.DataFrame,start,stop)->np.ndarray:
 
 
 def dtr(arr,o=2):
+    # ii-a-i
     if any(np.isnan(arr)):
         raise ValueError(f"nan in the array")
     a=arr.copy()
@@ -179,12 +180,11 @@ def nav(f:pd.DataFrame,i:str,v:float):
 
 
 def roll_pct(f,i,dur=5,start="2022"):
-    data=f[i].dropna().rolling(dur).mean().pct_change().iloc[1:]
-    data_std=np.std(data)
-    fg,ax=plt.subplots(figsize=(12,12))
+    d=f[i].dropna().rolling(dur).mean().pct_change().iloc[1:]
+    d_std=np.std(d)
+    fg,ax=plt.subplots(figsize=(8,8))
     ax.plot(data[f"{start}":],color="black")
-    [ax.axhline(color="red",y=data_std*q) for q in (-2,-1,1,2)]
-    plt.show()
+    [ax.axhline(color="red",y=d_std*q) for q in (-2,-1,1,2)]
 
 
 def rng(f:pd.DataFrame,i:str,
