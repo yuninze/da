@@ -2,23 +2,11 @@ import streamlit as st
 from PIL import Image
 from da import *
 
-print(os.getcwd())
+print(f"initialized in {os.getcwd()}")
 
-# ornament
-logo=Image.open("e:/dnld/kkk.jpg")
-st.title("da::StreamLit Trial")
-st.image(logo)
-
-# control element example
-# if st.checkbox(f"Show dropna-ed samples"):
-#     st.subheader("Row samples")
-#     st.write(f.dropna(thresh=20).sample(5))
-# st.button("fuck0")
-# st.selectbox("fuck1",
-#     options=("選択肢1", "選択肢2", "選択肢3"))
-# st.checkbox("checkbox")
-# st.radio("radiobutton",
-#     options=("選択肢1", "選択肢2", "選択肢3"))
+# ornament and asset
+imgs={q.name:Image.open(f"asset/{q.name}") for q in os.scandir("asset") if q.name.endswith(".png")}
+st.title("스타벅스 와이파이에 접속하셨.")
 
 @st.cache
 def get_data(path="c:/code/f.csv"):
@@ -27,9 +15,17 @@ def get_data(path="c:/code/f.csv"):
         converters={"date":pd.to_datetime})
 
 def main():
+    selections=list(imgs.keys())
+    selection =st.radio("객체에 집중할 기회 갖기",selections)
+    st.header(f"radio button '{selection}'")
+    for imgname in selections:
+        if selection==imgname:
+            img_show(selection)
+        else:
+            continue
     features=["show samples","waratah","ng","relevance","rolling pct ch"]
     feature =st.sidebar.selectbox("features_listbox",features)
-    st.header(f"selected_feature '{feature}'")
+    st.header(f"sidebar listbox '{feature}'")
     if feature==features[0]:
         show("show samples")
     elif feature==features[1]:
@@ -40,6 +36,11 @@ def main():
         show("relevance")
     elif feature==features[4]:
         show("roll")
+    else:
+        ...
+
+def img_show(string):
+    st.image(imgs[string])
 
 def show(string):
     f=get_data()
