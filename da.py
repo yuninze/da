@@ -156,7 +156,7 @@ def act(t,i=None):
         a  =a.iloc[:,0] / a.iloc[:,1]
     else:
         a  =t.dropna()
-    if not all(np.sign(a)):
+    if not np.sign(a).sum()==len(a):
         a_l=scipy.stats.yeojohnson(a)[0]
     else:
         a_l=np.log(a)
@@ -179,10 +179,11 @@ def nav(f:pd.DataFrame,i:str,v:float):
     return viewport
 
 
-def roll_pct(f,i,dur=5,start="2022"):
+def roll_pct(f,i,dur=5,start="2022",ax=None):
     d=f[i].dropna().rolling(dur).mean().pct_change().iloc[1:]
     d_std=np.std(d)
-    fg,ax=plt.subplots(figsize=(8,8))
+    if ax is None:
+        fg,ax=plt.subplots(figsize=(6,6))
     ax.plot(d[f"{start}":],color="black")
     [ax.axhline(color="red",y=d_std*q) for q in (-2,-1,1,2)]
 
