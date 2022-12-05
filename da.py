@@ -58,7 +58,7 @@ def index_full_range(f:pd.DataFrame):
         index=pd.date_range(f.index.min(),f.index.max(),freq="D"))
 
 
-def getdata(days_visit=10,save=True):
+def getdata(days_visit=10):
     f=pd.read_csv("c:/code/f.csv",
         index_col="date",
         converters={"date":pd.to_datetime})
@@ -90,12 +90,9 @@ def getdata(days_visit=10,save=True):
     f.index.name="date"
 
     print(f[["ie","zs","si","zc","uj","sp"]])
-    if save:
-        ask=input("input y to save above::")
-        if not ask in ["n","N"]:
-            f.to_csv("c:/code/f.csv")
-    else:
-        print(f"nothing written")
+    ask=input("input y to save above::")
+    if not ask in ["n","N"]:
+        f.to_csv("c:/code/f.csv")
     return f
 
 

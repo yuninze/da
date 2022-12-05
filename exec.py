@@ -26,10 +26,10 @@ plt.title("examplar 0"),plt.show()
 
 # examplar 1
 freq       ="2d"
-f_cols     =["by","cb","fs","hs","cl","ie"]
+f_cols     =["by","cb","hs","cl","ie"]
 f0=f[f_cols]
-f1=f0.resample(freq).mean().dropna()
-f2=f1.apply(lambda q:scipy.stats.yeojohnson(q)[0]).diff().iloc[1:]
+f1=f0.resample(freq).mean().diff().dropna()
+f2=f1.apply(lambda q:scipy.stats.zscore(scipy.stats.yeojohnson(q)[0]))
 hm(f2.corr()),plt.show()
 
 # aft:: pp.428
