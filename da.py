@@ -58,7 +58,7 @@ def index_full_range(f:pd.DataFrame):
         index=pd.date_range(f.index.min(),f.index.max(),freq="D"))
 
 
-def getdata(days_visit=10):
+def getdata(days_visit=10,save=True):
     f=pd.read_csv("c:/code/f.csv",
         index_col="date",
         converters={"date":pd.to_datetime})
@@ -90,9 +90,12 @@ def getdata(days_visit=10):
     f.index.name="date"
 
     print(f[["ie","zs","si","zc","uj","sp"]])
-    ask=input("input y to save above::")
-    if not ask in ["n","N"]:
-        f.to_csv("c:/code/f.csv")
+    if save:
+        ask=input("input y to save above::")
+        if not ask in ["n","N"]:
+            f.to_csv("c:/code/f.csv")
+    else:
+        print(f"nothing written")
     return f
 
 
@@ -183,7 +186,7 @@ def roll_pct(f,i,dur=5,start="2022"):
     d=f[i].dropna().rolling(dur).mean().pct_change().iloc[1:]
     d_std=np.std(d)
     fg,ax=plt.subplots(figsize=(8,8))
-    ax.plot(data[f"{start}":],color="black")
+    ax.plot(d[f"{start}":],color="black")
     [ax.axhline(color="red",y=d_std*q) for q in (-2,-1,1,2)]
 
 
