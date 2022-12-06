@@ -19,7 +19,7 @@ intern={"ci":"CPIAUCSL",
         "pi":"PPIACO",
         "ii":"PCEPI",
         "hi":"CSUSHPISA",
-        "cb":"BAMLH0A0HYM2EY",
+        "cb":"BAMLH0A0HYM2",
         "fs":"STLFSI4",
         "ic":"ICSA",
         "pr":"PAYEMS",
@@ -43,7 +43,8 @@ extern={"zs":"ZS=F",
         "ue":"EURUSD=X",
         "hs":"^HSI",
         "vn":"VNM",
-        "sp":"^GSPC",}
+        "sp":"^GSPC",
+        "by":"^TNX"}
 
 
 def apnd(path:str)->pd.DataFrame:
@@ -60,21 +61,21 @@ def index_full_range(f:pd.DataFrame):
 
 def getdata(days_visit=10):
     f=pd.read_csv("c:/code/f.csv",
-        index_col="date",
-        converters={"date":pd.to_datetime})
-
+        index_col="date",converters={"date":pd.to_datetime})
+    
+    renew_data_end=pd.Timestamp("today").floor("d")
     if days_visit<0:
         renew_data_start=pd.Timestamp("1980-01-01")
+        f=pd.DataFrame(
+            index=pd.date_range("1980-01-01",renew_data_end,freq="D"))
     else:
         renew_data_start=f.index.max()-pd.Timedelta(days=days_visit)
-    renew_data_end=pd.Timestamp("today").floor("d")
 
     renew_ids_fred=list(set(intern.keys())-set(extern.keys()))
     renew_data_fred:pd.DataFrame=(
         pdd.DataReader([intern[q] for q in renew_ids_fred],"fred",
             start=renew_data_start,end=renew_data_end)
         .set_axis(renew_ids_fred,axis=1))
-
     renew_ids_yahoo=list(extern.values())
     renew_data_yahoo:pd.DataFrame=(
         pdd.DataReader(renew_ids_yahoo,"yahoo",
@@ -83,10 +84,12 @@ def getdata(days_visit=10):
         .set_axis(list(extern.keys()),axis=1))
 
     renew_data=renew_data_fred.combine_first(renew_data_yahoo)
-    f=(f.reindex(
-        pd.date_range(f.index.min(),f.index.max(),freq="D"))
-        .combine_first(renew_data))
-    f["ie"]=f["by"]-f["iy"] # daily ie=(basis yield)-(ii yield)
+    if days_visit<0:
+        f=renew_data
+    else:
+        f=(f.reindex(pd.date_range(f.index.min(),f.index.max(),freq="D"))
+            .combine_first(renew_data))
+    f["ie"]=f["by"]-f["iy"]
     f.index.name="date"
 
     print(f[["ie","zs","si","zc","uj","sp"]])

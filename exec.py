@@ -40,6 +40,7 @@ ax[0].axhline(color="red",alpha=0.5,y=data.iloc[-1])
 data=f[["fr","by"]].dropna().loc["1995":]
 ax[1].plot(data.loc["2016":],alpha=.8)
 ax[1].axhline(color="red",alpha=0.5,y=data.iloc[-1,0]+.45)
+# constant is upcoming expectation
 
 # aft:: pp.428
 from statsmodels.tsa.stattools import adfuller as adf_
