@@ -7,7 +7,7 @@
  - Prominent 금융상품에 대해 rolling over가 고려되지 않은 중대한 문제가 있어요
 
 # 계획
- - rolling over 고려하기
+ - 대시보드 만들기
 
 # 참고문헌
  - Chairman Bernanke's Lecture Series
@@ -15,5 +15,5 @@
  - Fed Challenge
 
 # 라이센스
- - 스크립트는 모두 wrapper이므로 아무렇게나 써도 되요
+ - 스크립트는 wrapper라서 아무렇게나 써도 되요
  - 일부 거시지표는 licensed이므로 citation 유의해야 되요
