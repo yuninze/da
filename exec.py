@@ -13,12 +13,12 @@ plt.show()
 roll_pct(f,"si")
 
 # examplar 0
-freq       ="1d"
+freq       ="2d"
 f_cols     =["hs","ic","cb","ys"]
 f_cols_name=["HSI","JC","CBYS","LSYS"]
 f0=f[f_cols]
 f1=f0.resample(freq).mean().dropna()
-f2=f1[["hs","ic","cb"]].apply(lambda q:scipy.stats.zscore(np.log(q)))
+f2=f1[["hs","ic","cb"]].apply(lambda q:scipy.stats.zscore(scipy.stats.yeojohnson(q)[0]))
 f2["ys"]=scipy.stats.zscore(f1["ys"])
 f3=f2.loc["2007":"2009"].set_axis(f_cols_name,axis=1)
 f3.plot(xlabel=f"{freq}",ylabel="",alpha=.6),
@@ -31,6 +31,15 @@ f0=f[f_cols]
 f1=f0.resample(freq).mean().diff().dropna()
 f2=f1.apply(lambda q:scipy.stats.zscore(scipy.stats.yeojohnson(q)[0]))
 hm(f2.corr()),plt.show()
+
+# examplar 2 is for current indexed-us10y fs ffr
+fg,ax=plt.subplots(2,1,figsize=(18,10))
+data=f.iy.dropna()
+ax[0].plot(data.loc["2016":],alpha=0.8)
+ax[0].axhline(color="red",alpha=0.5,y=data.iloc[-1])
+data=f[["fr","by"]].dropna().loc["1995":]
+ax[1].plot(data.loc["2016":],alpha=.8)
+ax[1].axhline(color="red",alpha=0.5,y=data.iloc[-1,0]+.45)
 
 # aft:: pp.428
 from statsmodels.tsa.stattools import adfuller as adf_

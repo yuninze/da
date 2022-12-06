@@ -1,12 +1,13 @@
 import streamlit as st
+from datetime import datetime
 from PIL import Image
 from da import *
 
-print(f"initialized in {os.getcwd()}")
+print(f"{datetime.now()}::initialized in {os.getcwd()}")
 
 # ornament and asset
 imgs={q.name:Image.open(f"asset/{q.name}") for q in os.scandir("asset") if q.name.endswith(".png")}
-st.title("스타벅스 와이파이에 접속하셨.")
+st.title("스타벅스 와이파이 접속.")
 
 @st.cache
 def get_data(path="c:/code/f.csv"):
@@ -16,12 +17,15 @@ def get_data(path="c:/code/f.csv"):
 
 def main():
     selections=list(imgs.keys())
-    selection =st.radio("객체에 집중할 기회 갖기",selections)
+    selection =st.radio("객체 집중 기회 갖기",selections)
     st.header(f"radio button '{selection}'")
     for imgname in selections:
         if selection==imgname:
             img_show(selection)
+            print(f"{datetime.now()}::imgsel iteration has been broken")
+            break
         else:
+            print(f"{datetime.now()}::wasn't {imgname}")
             continue
     features=["show samples","waratah","ng","relevance","rolling pct ch"]
     feature =st.sidebar.selectbox("features_listbox",features)
