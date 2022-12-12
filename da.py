@@ -17,7 +17,7 @@ sns.set_theme(style="whitegrid",palette="bright",font="monospace")
 
 intern={"ci":"CPIAUCSL",
         "pi":"PPIACO",
-        "ii":"PCEPI",
+        "ii":"PCEPILFE",
         "hi":"CSUSHPISA",
         "cb":"BAMLH0A0HYM2",
         "fs":"STLFSI4",
@@ -26,11 +26,12 @@ intern={"ci":"CPIAUCSL",
         "ys":"T10Y3M",
         "ng":"DHHNGSP",
         "cl":"DCOILWTICO",
-        "fr":"DFF",
+        "fr":"DFF", # DFF=SOFR
         "nk":"NIKKEI225",
         "fert":"PCU325311325311",
         "iy":"DFII10",
-        "by":"DGS10"}
+        "by":"DGS10",
+        "ur":"UNRATE",}
 extern={"zs":"ZS=F",
         "zc":"ZC=F",
         "zw":"ZW=F",
@@ -154,23 +155,27 @@ def deflator(f):
 
 
 def act(t,i=None):
+    # if deflator is None, just calculate lzp
     if not i is None:
         a  =pd.concat([t,i],axis=1).dropna()
+        a_ =a.iloc[:,0]
         a  =a.iloc[:,0] / a.iloc[:,1]
     else:
         a  =t.dropna()
+    # using yeo-johnson
     if not np.sign(a).sum()==len(a):
         a_l=scipy.stats.yeojohnson(a)[0]
     else:
         a_l=np.log(a)
+    # 
     a_ls   =scipy.stats.zscore(a_l)
     a_lsp  =scipy.stats.norm.cdf(a_ls,
       loc  =a_ls.mean(),
       scale=a_ls.std(ddof=1))
     a_lsp_f=pd.Series(a_lsp,index=a.index)
     return pd.concat(
-        [a,a_lsp_f],axis=1).set_axis(
-            [f"{t.name}",f"{t.name}lp"],axis=1)
+        [a_,a,a_lsp_f],axis=1).set_axis(
+            [f"{t.name}",f"{t.name}_",f"{t.name}lp"],axis=1)
 
 
 def nav(f:pd.DataFrame,i:str,v:float):
@@ -182,13 +187,19 @@ def nav(f:pd.DataFrame,i:str,v:float):
     return viewport
 
 
-def roll_pct(f,i,dur=5,start="2022",ax=None):
+def roll_pct(f,i,dur=5,start="2022",ax=None,figsize=(8,8),title=""):
     d=f[i].dropna().rolling(dur).mean().pct_change().iloc[1:]
     d_std=np.std(d)
     if ax is None:
-        fg,ax=plt.subplots(figsize=(6,6))
-    ax.plot(d[f"{start}":],color="black")
-    [ax.axhline(color="red",y=d_std*q) for q in (-2,-1,1,2)]
+        # creating plt canvas
+        fg,ax=plt.subplots(figsize=figsize)
+    else:
+        # mutating input ax
+        fg=False
+    ax.plot(d[f"{start}":])
+    ax.set_title(title)
+    [ax.axhline(y=d_std*q,alpha=.5,color="red") for q in (-2,-1,1,2)]
+    return fg or None
 
 
 def rng(f:pd.DataFrame,i:str,
@@ -304,8 +315,7 @@ def hm_(f):
     ax[2].title.set_text("impt")
 
 
-def pp(f,
-    vars=None,l=False,hue=None):
+def pp(f,vars=None,l=False,hue=None):
     (sns.pairplot(data=f,vars=vars,hue=hue,
         dropna=False,kind="scatter",diag_kind="hist")
         .map_diag(sns.histplot,log_scale=l,
