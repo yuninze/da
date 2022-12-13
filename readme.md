@@ -7,13 +7,10 @@
  - Prominent 금융상품에 대해 rolling over가 고려되지 않은 중대한 문제가 있어요
 
 # 계획
- - 대시보드 만들기
+ - 중요 후행성 거시지표 관련
 
 # 참고문헌
- - Chairman Bernanke's Lecture Series
- - Fred
- - Fed Challenge
+ - Bernanke's Lecture Serie
 
 # 라이센스
  - 스크립트는 wrapper라서 아무렇게나 써도 되요
- - 일부 거시지표는 licensed이므로 citation 유의해야 되요
