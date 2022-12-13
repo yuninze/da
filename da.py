@@ -106,7 +106,7 @@ def mon(f:pd.DataFrame,start,stop)->np.ndarray:
             dtype="bool")
 
 
-def dtr(arr,o=2):
+def dtr(arr,o=1):
     # ii-a-i
     if any(np.isnan(arr)):
         raise ValueError(f"nan in the array")
@@ -167,7 +167,7 @@ def act(t,i=None):
         a_l=scipy.stats.yeojohnson(a)[0]
     else:
         a_l=np.log(a)
-    # 
+    # de-ta
     a_ls   =scipy.stats.zscore(a_l)
     a_lsp  =scipy.stats.norm.cdf(a_ls,
       loc  =a_ls.mean(),

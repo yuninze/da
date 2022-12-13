@@ -1,4 +1,5 @@
-f=getdata(5)
+# yielding
+f=getdata()
 
 # integrity check
 import random
@@ -9,6 +10,9 @@ plt.show()
 scipy.stats.probplot(f.ng.dropna(),dist="norm",plot=plt),
 plt.show()
 
+# examplar
+
+
 # aft:: pp.428
 from statsmodels.tsa.stattools import adfuller as adf_
 def adf(f)->dict:
@@ -17,13 +21,6 @@ def adf(f)->dict:
     if enog[1]>.05:
         print("adf failed")
     return enog
-
-# low-order uv
-import scipy.stats
-slope,intercept,rv,pv,stderr=scipy.stats.linregress(x0,y0)
-y1=[(slope*x)+intercept for x in x1]
-plt.scatter(x0.values,y0.values)
-plt.plot(x0,y1)
 
 #high-order uv
 hoe=np.poly1d(np.polyfit(x,y,2))

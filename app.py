@@ -4,7 +4,7 @@ from da import *
 from datetime import datetime
 
 # ornament
-st.set_page_config(page_title="Product Snapshot",layout="centered")
+st.set_page_config(page_title="Product Snapshot 윤인재",layout="centered")
 print(f"{datetime.now()}::initialized in {os.getcwd()}")
 
 # yielding
@@ -15,7 +15,7 @@ f=get_data()
 
 # head
 st.header("Product Snapshot")
-prods=["Indices","Commodities","Utilities","Images","Citations"]
+prods=["Indices","Commodities","Macro","Utilities","Citations"]
 t0,t1,t2,t3,t4=st.tabs(prods)
 
 # tabs
@@ -50,7 +50,7 @@ with t0:
     st.pyplot(fg)
     # row 2
     st.subheader(f"Long-Short Yield Spread")
-    st.markdown("10년물 일드-3개월물 일드 차이(스프레드)와 기업채 스프레드 등 몇 가지 거시지표 및 금융상품 가격이다. 안전자산으로서 국채는 장기물 일드가 단기물 일드보다 높게 유지되지만, 장기 경제 컨센서스가 불량해지면 단기물 일드가 높아진다. 일드 역전에의 도상에 있는 것을 일드 커브 플래트닝, 반대의 경우를 스티프닝이라고 한다. 일드 커브 역전으로부터 보통 20분기 이내에 경기침체가 발생하는 등, 장단기 스프레드 흐름은 금리정책에 대한 시장의 반응을 그대로 대변하므로 경제 사이클 유추에 기업채 스프레드와 함께 더할나위 없는 지표로 된다.")
+    st.markdown("10년물 일드-3개월물 일드 차이(스프레드)와 기업채 스프레드 등 몇 가지 거시지표 및 금융상품 가격이다. 안전자산으로서 국채는 장기물 일드가 단기물 일드보다 높게 유지되지만, 장기 경제 컨센서스가 불량해지면 단기물 일드가 높아진다. 일드 역전에의 도상에 있는 것을 일드 커브 플래트닝, 반대의 경우를 스티프닝이라고 한다. 일드 커브 역전으로부터 보통 20분기 이내에 경기침체가 발생하는 등, 장단기 스프레드 흐름은 금리정책에 대한 시장의 반응을 기탄없이 대변하며, 경제 사이클 추론에 기업채 스프레드와 함께 더할나위 없는 지표로 된다.")
     freq="3d"
     f_cols=["hs","ic","cb","ys"]
     f_cols_name=["HSI","JC","CBYS","LSYS"]
@@ -84,7 +84,7 @@ with t1:
     cols_nm=["W.T.I.","Nat-Gas","Silver","Copper","Soybean"]
     # row 0
     st.subheader("Latests")
-    st.markdown("주요 원자재의 가격, 계산된 명목 가격(deflated/nominal price)이 현재 상위 몇 %에 해당하는지 표시한다. 금융상품 가격은 로그정규분포를 하는 때가 많고 비정상성이 심하다. 일반적으로 시중 유동성 총량의 증가가 원자재 가격의 기저를 형성하는 경향이 있고, 산업금속은 21세기 들어 특정 국가의 경제 상황과 동기화되고 random-walking하므로 쉽게 mean-reverting하지 않는다. 매우 예외적으로 ADF를 1% 신뢰구간에서 통과하는 비정상적 가격 시계열의 상품도 있으며, deflating이 필요하지 않을지도 모른다.")
+    st.markdown("주요 원자재의 가격, 계산된 명목 가격(deflated/nominal price)이 현재 상위 몇 %에 해당하는지 표시한다. 금융상품 가격은 로그정규분포를 하는 때가 많고 비정상성이 심하다. 예외적으로 ADF를 1% 신뢰구간에서 통과하는 비정상적 가격 시계열의 상품도 있으며 deflating이 필요하지 않을지도 모른다.")
     ie=deflator(f)
     data={q:act(f[q],ie).dropna().iloc[-5:] for q in cols}
     for q in enumerate(st.columns(len(cols))):
@@ -119,10 +119,46 @@ with t1:
     st.text("end of page")
 with t2:
     # params
+    cols=["cb","ic","ur"]
+    cols_name=["CBYS","ICSA","UNRATE"]
+    # row 0
+    st.subheader("Macro Indicators")
+    st.markdown("Macro indicators, especially those related to employment status, are vital for policies but has no timeness at all. In most cases, those are regarded to be forecasted.")
+    data=(f[cols]
+        .resample("5d")
+        .mean()
+        .dropna()
+        .set_axis(cols_name,axis=1)
+        .apply(lambda q:scipy.stats.zscore(scipy.stats.yeojohnson(q)[0])))
+    dur=st.slider(
+        "Duration (year)",
+        min_value=data.index.min().year,
+        max_value=data.index.max().year,
+        value=(2006,2009),
+        step=1,)
+    data_=data.loc[f"{dur[0]}":f"{dur[1]}"]
+    fg,ax=plt.subplots(figsize=(6,6))
+    ax.plot(data_,alpha=.8)
+    ax.legend(cols_name)
+    plt.xticks(rotation=45)
+    st.pyplot(fg)
+    # row 1
+    st.subheader("Assets")
+    st.markdown("This section is for testing purpose. Selecting something reloads whole script.")
+    imgs={q.name:Image.open(f"asset/{q.name}") for q in os.scandir("asset") if q.name.endswith(".png") or q.name.endswith(".jpg")}
+    if not len(imgs)==0:
+        img_sel=st.radio("images",imgs.keys(),label_visibility="hidden")
+        for img_label in imgs.keys():
+            if img_label==img_sel:
+                st.image(imgs[img_label],)
+    else:
+        st.markdown(f"No imagefiles")
+with t3:
+    # params
     examplars=[("cb","fs"),("cb","ic"),("cl","ie"),("ng","fert")]
     # row 0
     st.subheader("Utilities: Linregress")
-    st.markdown("단선형회귀를 수행한다. 이 대시보드에서 다루는 데이터는 전부 비정상 시계열이다. 여기서는 아무런 변환을 수행하지 않으므로 의사회귀가 발생한다. 금융상품 가격은 시중 유동성 총량에 비례하므로 원자재와 지수 선물 가격은 양의 상관관계를 가지는 듯하다. 안전상품인 국채 일드와 위험상품인 항셍 가격 사이에는 음의 상관관계가 있는 듯하다. 그러나 사실 각 계열 사이의 선형성은, 특히 sampling rate가 높을 수록 일관적이지 않다. 10YIE, CPI 등 유력한 지표의 범위를 바탕으로 grouping해 조건하 상관성을 톺아볼 수 있을 것이다.")
+    st.markdown("단선형회귀를 수행한다. 이 대시보드에서 다루는 데이터는 비정상이다. 여기서는 아무런 변환을 수행하지 않으므로 의사회귀가 발생한다. 금융상품 가격은 시중 유동성 총량에 비례하므로 원자재와 지수 선물 가격은 양의 상관관계를 가지는 듯하다. 안전상품인 국채 일드와 위험상품인 항셍 가격 사이에는 음의 상관관계가 있는 듯하다. 그러나 사실 각 계열 사이의 선형성은, 특히 sampling rate가 높을 수록 일관적이지 않다. 10YIE, CPI 등 유력한 지표의 범위를 바탕으로 grouping해 조건하 상관성을 톺아볼 수 있을 것이다.")
     q0,q1=st.columns(2)
     x0_=q0.selectbox("x",f.columns)
     y0_=q1.selectbox("y",f.columns)
@@ -162,21 +198,9 @@ with t2:
         st.markdown("Select enobs, exobs")
     # row 1
     st.text("end of page")
-with t3:
-    st.subheader("Images")
-    st.markdown("Selecting something reloads whole script.")
-    imgs={q.name:Image.open(f"asset/{q.name}") for q in os.scandir("asset") if q.name.endswith(".png") or q.name.endswith(".jpg")}
-    if not len(imgs)==0:
-        img_sel=st.radio("images",imgs.keys(),label_visibility="hidden")
-        for img_label in imgs.keys():
-            if img_label==img_sel:
-                st.image(imgs[img_label],)
-    else:
-        st.markdown(f"No imagefiles")
 with t4:
     st.subheader("Citations")
     with open(f"asset/cite.txt",encoding="utf-8-sig") as citefile:
         sents=citefile.readlines()
     for q in sents:
         st.markdown(q)
-
