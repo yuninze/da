@@ -9,11 +9,13 @@ from itertools import product
 from tqdm import tqdm
 from sklearn.impute import KNNImputer
 
+
 rnd=np.random.RandomState(0)
 pd.options.display.min_rows=10
 pd.options.display.max_columns=6
 pd.options.display.precision=5
 sns.set_theme(style="whitegrid",palette="bright",font="monospace")
+
 
 intern={"ci":"CPIAUCSL",
         "pi":"PPIACO",
@@ -26,7 +28,7 @@ intern={"ci":"CPIAUCSL",
         "ys":"T10Y3M",
         "ng":"DHHNGSP",
         "cl":"DCOILWTICO",
-        "fr":"DFF", # DFF=SOFR
+        "fr":"SOFR", # DFF=SOFR
         "nk":"NIKKEI225",
         "fert":"PCU325311325311",
         "iy":"DFII10",
@@ -60,26 +62,28 @@ def index_full_range(f:pd.DataFrame):
         index=pd.date_range(f.index.min(),f.index.max(),freq="D"))
 
 
-def getdata(days_visit=10):
+def getdata(days_visit=90,end=None):
     f=pd.read_csv("c:/code/f.csv",
         index_col="date",converters={"date":pd.to_datetime})
     
-    renew_data_end=pd.Timestamp("today").floor("d")
+    with open("c:/code/fred.key") as fredkey:
+        fredkey=fredkey.readline()
+    
+    if not end is None:
+        renew_data_end=pd.Timestamp("today").floor("d")
+    else:
+        renew_data_end=end
+    
     if days_visit<0:
         renew_data_start=pd.Timestamp("1980-01-01")
-        f=pd.DataFrame(
-            index=pd.date_range("1980-01-01",renew_data_end,freq="D"))
+        f=pd.DataFrame(index=pd.date_range("1980-01-01",renew_data_end,freq="D"))
     else:
         renew_data_start=f.index.max()-pd.Timedelta(days=days_visit)
 
-    renew_ids_fred=list(set(intern.keys())-set(extern.keys()))
-    renew_data_fred:pd.DataFrame=(
-        pdd.DataReader([intern[q] for q in renew_ids_fred],"fred",
-            start=renew_data_start,end=renew_data_end)
-        .set_axis(renew_ids_fred,axis=1))
-    renew_ids_yahoo=list(extern.values())
-    renew_data_yahoo:pd.DataFrame=(
-        pdd.DataReader(renew_ids_yahoo,"yahoo",
+    renew_data_fred=(pdd.DataReader(list(intern.values()),"fred",
+            start=renew_data_start,end=renew_data_end,api_key=fredkey)
+        .set_axis(list(intern.keys()),axis=1))
+    renew_data_yahoo=(pdd.DataReader(list(intern.values()),"yahoo",
             start=renew_data_start,end=renew_data_end)
         .loc[:,"Close"]
         .set_axis(list(extern.keys()),axis=1))
@@ -93,7 +97,7 @@ def getdata(days_visit=10):
     f["ie"]=f["by"]-f["iy"]
     f.index.name="date"
 
-    print(f[["ie","zs","si","zc","uj","sp"]])
+    print(f[["ys","si","zc","uj","sp"]])
     ask=input("input y to save above::")
     if not ask in ["n","N"]:
         f.to_csv("c:/code/f.csv")
@@ -287,7 +291,8 @@ def hm(f,mm=(-1,1),ax=None,cbar=False,title=None):
     # pp.201
     if title is None:
         title=f"{', '.join(f.columns)}"
-    mask=np.triu(np.ones_like(f,dtype=bool))
+    mask=np.triu(np.ones_like(f,dtype=bool))[1:,:-1]
+    f=f.iloc[1:,:-1]
     cmap=sns.diverging_palette(250,10,as_cmap=True)
     if ax is None:
         plt.subplots(figsize=(22,20))
