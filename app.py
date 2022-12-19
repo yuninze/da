@@ -39,17 +39,18 @@ with t0:
     st.subheader("Inflation-indexed U.S.10Y")
     st.markdown("인플레이션 반영 10년 국채 일드는 국채 10년물 수익률을 CPI-deflating한 것으로 명목 국채 일드다.")
     fg,ax=plt.subplots(figsize=(8,4))
-    data=f.iy.dropna().loc["2006":]
+    data=f.iy.dropna().loc["2007":]
     ax.plot(data,alpha=.8,color="darkorange")
-    ax.axhline(color="red",alpha=.5,y=data.iloc[-1])
+    ax.axhline(color="orange",alpha=.5,y=data.iloc[-1])
     st.pyplot(fg)
     # row 1
     st.subheader("U.S.10Y+F.F.R.+Upcoming F.F.R.")
-    st.markdown("10년 국채 일드, 기준금리(담보대익일조달금리), 차기 예상 기준금리이다. CMA 등 익일물 대출금리가 SOFR임을 즉시 알 수 있다.")
+    st.markdown("10년 국채 일드, 기준금리(담보대익일조달금리), 차기 예상 기준금리이다. CMA 등 익일물 대출금리가 SOFR다.")
     fg,ax=plt.subplots(figsize=(8,4))
-    data=f[["fr","by"]].loc["2018":].dropna()
+    data=f[["fr","by"]].loc["2007":].dropna()
     ax.plot(data,alpha=.8)
-    ax.axhline(color="red",alpha=.5,y=data.iloc[-1,0]+dff_next_bp)
+    ax.axhline(color="blue",alpha=.5,y=data.iloc[-1,0]+dff_next_bp)
+    ax.axhline(color="orange",alpha=.5,y=data.iloc[-1,1])
     st.pyplot(fg)
     # row 2
     st.subheader("Long-Short Yield Spread")
@@ -143,7 +144,7 @@ with t2:
     st.pyplot(fg)
     # row 1
     st.subheader("Price Indices")
-    st.markdown("Price indices are a deflator of given period.")
+    st.markdown("Price indices are a deflator of given period. Values are shifted for 1 month.")
     cols=["pi","ci","ii"]
     cols_name=["PPI","CPI","PCE"]
     data=f[cols].resample("m").mean().pct_change().shift()[3:]
@@ -151,7 +152,7 @@ with t2:
         "Duration (year)",
         min_value=data.index.min().year,
         max_value=data.index.max().year,
-        value=(2020,2022),
+        value=(2021,2022),
         step=1,)
     data_=data.loc[f"{dur[0]}":f"{dur[1]}"]
     fg,ax=plt.subplots(figsize=(8,4))
@@ -164,7 +165,6 @@ with t3:
     # params
     examplars=[("cb","fs"),("cb","ic"),("cl","ie"),("ng","fert")]
     # row 0
-    st.subheader("Utilities")
     st.subheader("Linregress")
     st.markdown("단선형회귀를 수행한다. 여기서의 계열은 비정상이고 변환을 하지 않아 의사회귀가 생긴다. 계열간 상관계수는 sampling rate가 높을 수록 낮아진다. 또한, Random walking에서 계열간 선형관계는 옅어진다. 10YIE, CPI 등 유력 지표의 범위를 바탕으로 grouping해 조건하 상관성을 볼 수 있다.")
     q0,q1=st.columns(2)

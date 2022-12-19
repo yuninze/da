@@ -14,13 +14,8 @@ plt.show()
 
 
 # aft:: pp.428
-from statsmodels.tsa.stattools import adfuller as adf_
-def adf(f)->dict:
-    f=f.dropna()
-    enog=adf(f)
-    if enog[1]>.05:
-        print("adf failed")
-    return enog
+from statsmodels.tsa.stattools import adfuller as adf
+adf(f.ng.dropna())
 
 #high-order uv
 hoe=np.poly1d(np.polyfit(x,y,2))

@@ -3,6 +3,7 @@ import numpy as np
 import scipy.stats
 import pandas as pd
 import pandas_datareader as pdd
+import yfinance
 import matplotlib.pyplot as plt
 import seaborn as sns
 from itertools import product
@@ -26,8 +27,6 @@ intern={"ci":"CPIAUCSL",
         "ic":"ICSA",
         "pr":"PAYEMS",
         "ys":"T10Y3M",
-        "ng":"DHHNGSP",
-        "cl":"DCOILWTICO",
         "fr":"SOFR", # DFF=SOFR
         "nk":"NIKKEI225",
         "fert":"PCU325311325311",
@@ -69,10 +68,10 @@ def getdata(days_visit=90,end=None):
     with open("c:/code/fred.key") as fredkey:
         fredkey=fredkey.readline()
     
-    if not end is None:
-        renew_data_end=pd.Timestamp("today").floor("d")
-    else:
+    if end:
         renew_data_end=end
+    else:
+        renew_data_end=pd.Timestamp("today").floor("d")
     
     if days_visit<0:
         renew_data_start=pd.Timestamp("1980-01-01")
@@ -82,11 +81,13 @@ def getdata(days_visit=90,end=None):
 
     renew_data_fred=(pdd.DataReader(list(intern.values()),"fred",
             start=renew_data_start,end=renew_data_end,api_key=fredkey)
-        .set_axis(list(intern.keys()),axis=1))
-    renew_data_yahoo=(pdd.DataReader(list(intern.values()),"yahoo",
-            start=renew_data_start,end=renew_data_end)
+        .rename({q:w for w,q in intern.items()},axis=1))
+
+    yfinance.pdr_override()
+    renew_data_yahoo=(pdd.data.get_data_yahoo(list(extern.values()),
+        start=renew_data_start,end=renew_data_end)
         .loc[:,"Close"]
-        .set_axis(list(extern.keys()),axis=1))
+        .rename({q:w for w,q in extern.items()},axis=1))
 
     renew_data=renew_data_fred.combine_first(renew_data_yahoo)
     if days_visit<0:
@@ -160,12 +161,16 @@ def deflator(f):
 
 def act(t,i=None):
     # if deflator is None, just calculate lzp
-    if not i is None:
-        a  =pd.concat([t,i],axis=1).dropna()
-        a_ =a.iloc[:,0]
-        a  =a.iloc[:,0] / a.iloc[:,1]
+    if t.name=="ng":
+        a=t.dropna()
+        a_=t.dropna()
+    elif not i is None:
+        a=pd.concat([t,i],axis=1).dropna()
+        a_=a.iloc[:,0]
+        a=a.iloc[:,0] / a.iloc[:,1]
     else:
-        a  =t.dropna()
+        a=t.dropna()
+        a_=t.dropna()
     # using yeo-johnson
     if not np.sign(a).sum()==len(a):
         a_l=scipy.stats.yeojohnson(a)[0]
