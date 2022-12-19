@@ -4,17 +4,14 @@ from PIL import Image
 from da import *
 
 # ornament
-st.set_page_config(
-    page_title="Product Snapshot 윤인재",
-    layout="centered")
+dff_next_bp=.25
+st.set_page_config(page_title="Product Snapshot 윤인재",layout="centered")
 print(f"{datetime.now()}::initialized in {os.getcwd()}")
 
 # yielding st.experimental_memo
 def getdata_(path="c:/code/f.csv"):
-    return pd.read_csv(path,index_col="date",
-        converters={"date":pd.to_datetime})
+    return pd.read_csv(path,index_col="date",converters={"date":pd.to_datetime})
 f=getdata_()
-dff_next_bp=.25
 
 # head
 st.header("Product Snapshot")
@@ -123,7 +120,7 @@ with t2:
     # params
     # row 0
     st.subheader("Coporate Bond Yield Spread vs. Labor Market")
-    st.markdown("Coporate bond yield is a vital forecaster of labor market.")
+    st.markdown("Coporate bond yield is a prominent forecaster of labor market.")
     cols=["cb","ic","ur"]
     cols_name=["CBYS","ICSA","UNRATE"]
     data=(f[cols].resample("5d").mean().dropna()
@@ -133,7 +130,7 @@ with t2:
         "Duration (year)",
         min_value=data.index.min().year,
         max_value=data.index.max().year,
-        value=(2020,2022),
+        value=(2006,2010),
         step=1,)
     data_=data.loc[f"{dur[0]}":f"{dur[1]}"]
     fg,ax=plt.subplots(figsize=(8,4))
@@ -152,7 +149,7 @@ with t2:
         "Duration (year)",
         min_value=data.index.min().year,
         max_value=data.index.max().year,
-        value=(2021,2022),
+        value=(2019,2022),
         step=1,)
     data_=data.loc[f"{dur[0]}":f"{dur[1]}"]
     fg,ax=plt.subplots(figsize=(8,4))

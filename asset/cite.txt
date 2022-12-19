@@ -14,3 +14,4 @@ H. Clark et al., How Stable Is China’s Growth? Shedding Light on Sparse Data, 
 Kevin L. Kliessen, Measuring Financial Market Stress, 2010.
 SAS를 이용한 현대통계학 2e, 최병선, 2003.
 통계학 3e, 류근관, 2016.
+Yahoo! API T&C, https://legal.yahoo.com/us/en/yahoo/terms/product-atos/apiforydn/index.html

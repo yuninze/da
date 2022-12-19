@@ -65,9 +65,6 @@ def getdata(days_visit=90,end=None):
     f=pd.read_csv("c:/code/f.csv",
         index_col="date",converters={"date":pd.to_datetime})
     
-    with open("c:/code/fred.key") as fredkey:
-        fredkey=fredkey.readline()
-    
     if end:
         renew_data_end=end
     else:
@@ -79,6 +76,8 @@ def getdata(days_visit=90,end=None):
     else:
         renew_data_start=f.index.max()-pd.Timedelta(days=days_visit)
 
+    with open("c:/code/fred.key",encoding="utf-8-sig") as fredkey:
+        fredkey=fredkey.readline()
     renew_data_fred=(pdd.DataReader(list(intern.values()),"fred",
             start=renew_data_start,end=renew_data_end,api_key=fredkey)
         .rename({q:w for w,q in intern.items()},axis=1))
