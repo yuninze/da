@@ -51,9 +51,7 @@ extern={"zs":"ZS=F",
 
 def apnd(path:str)->pd.DataFrame:
 	if not path.endswith("/"):path+="/"
-	return pd.concat(
-        [pd.read_csv(f"{path}{q.name}") for q in
-         os.scandir(path) if ".csv" in q.name],axis=0)
+	return pd.concat([pd.read_csv(f"{path}{q.name}") for q in os.scandir(path) if ".csv" in q.name],axis=0)
 
 
 def index_full_range(f:pd.DataFrame):
@@ -62,8 +60,7 @@ def index_full_range(f:pd.DataFrame):
 
 
 def getdata(days_visit=90,end=None):
-    f=pd.read_csv("c:/code/f.csv",
-        index_col="date",converters={"date":pd.to_datetime})
+    f=pd.read_csv("c:/code/f.csv",index_col="date",converters={"date":pd.to_datetime})
     
     with open("c:/code/fred.key") as fredkey:
         fredkey=fredkey.readline()
@@ -177,14 +174,11 @@ def act(t,i=None):
     else:
         a_l=np.log(a)
     # de-ta
-    a_ls   =scipy.stats.zscore(a_l)
-    a_lsp  =scipy.stats.norm.cdf(a_ls,
-      loc  =a_ls.mean(),
-      scale=a_ls.std(ddof=1))
+    a_ls=scipy.stats.zscore(a_l)
+    a_lsp=scipy.stats.norm.cdf(a_ls,loc=a_ls.mean(),scale=a_ls.std(ddof=1))
     a_lsp_f=pd.Series(a_lsp,index=a.index)
-    return pd.concat(
-        [a_,a,a_lsp_f],axis=1).set_axis(
-            [f"{t.name}",f"{t.name}_",f"{t.name}lp"],axis=1)
+    return (pd.concat([a_,a,a_lsp_f],axis=1)
+        .set_axis([f"{t.name}",f"{t.name}_",f"{t.name}lp"],axis=1))
 
 
 def nav(f:pd.DataFrame,i:str,v:float):
