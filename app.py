@@ -11,8 +11,7 @@ print(f"{datetime.now()}::initialized in {os.getcwd()}")
 
 # yielding st.experimental_memo
 def getdata_(path="c:/code/f.csv"):
-    return pd.read_csv(path,index_col="date",
-        converters={"date":pd.to_datetime})
+    return pd.read_csv(path,index_col="date",converters={"date":pd.to_datetime})
 f=getdata_()
 dff_next_bp=.25
 
