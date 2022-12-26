@@ -27,11 +27,12 @@ intern={"ci":"CPIAUCSL",
         "ic":"ICSA",
         "pr":"PAYEMS",
         "ys":"T10Y3M",
-        "fr":"SOFR", # DFF=SOFR
+        "fr":"SOFR", # appending SOFR as DFF
         "nk":"NIKKEI225",
         "fert":"PCU325311325311",
         "iy":"DFII10",
-        "by":"DGS10",
+        "us10y":"DGS10",
+        "us02y":"DGS2",
         "ur":"UNRATE",}
 extern={"zs":"ZS=F",
         "zc":"ZC=F",
@@ -46,7 +47,7 @@ extern={"zs":"ZS=F",
         "hs":"^HSI",
         "vn":"VNM",
         "sp":"^GSPC",
-        "by":"^TNX"}
+        "us10y":"^TNX"}
 
 
 def apnd(path:str)->pd.DataFrame:
@@ -61,14 +62,11 @@ def index_full_range(f:pd.DataFrame):
         index=pd.date_range(f.index.min(),f.index.max(),freq="D"))
 
 
-def getdata(days_visit=90,end=None):
+def getdata(days_visit=90,save=False):
     f=pd.read_csv("c:/code/f.csv",
         index_col="date",converters={"date":pd.to_datetime})
     
-    if end:
-        renew_data_end=end
-    else:
-        renew_data_end=pd.Timestamp("today").floor("d")
+    renew_data_end=pd.Timestamp("today").floor("d")
     
     if days_visit<0:
         renew_data_start=pd.Timestamp("1980-01-01")
@@ -94,12 +92,15 @@ def getdata(days_visit=90,end=None):
     else:
         f=(f.reindex(pd.date_range(f.index.min(),f.index.max(),freq="D"))
             .combine_first(renew_data))
-    f["ie"]=f["by"]-f["iy"]
+    f["ie"]=f["us10y"]-f["iy"]
     f.index.name="date"
 
     print(f[["ys","si","zc","uj","sp"]])
-    ask=input("input y to save above::")
-    if not ask in ["n","N"]:
+    if save:
+        f.to_csv("c:/code/f.csv")
+        return f
+    ask=input("input to save above::")
+    if not ask in ["n","N",""]:
         f.to_csv("c:/code/f.csv")
     return f
 

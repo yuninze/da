@@ -5,7 +5,7 @@ from da import *
 
 # ornament
 dff_next_bp=.25
-st.set_page_config(page_title="Product Snapshot 윤인재",layout="centered")
+st.set_page_config(page_title="Product Snapshot",layout="centered")
 print(f"{datetime.now()}::initialized in {os.getcwd()}")
 
 # yielding st.experimental_memo
@@ -20,12 +20,11 @@ t0,t1,t2,t3,t4=st.tabs(prods)
 
 # tabs
 with t0:
-    # param
-    # row 0
+    # row
     st.subheader("Latests")
     st.markdown("대표성과 적시성이 높은 상품 가격 또는 지표를 표시한다.")
-    cols=["by","iy","cb","ys","fr"]
-    cols_nm=["U.S.10Y","U.S.10Y-I","C.B.Y.S.","L.S.Y.S.","F.F.R."]
+    cols=["us02y","iy","cb","ys","fr"]
+    cols_nm=["U.S.02Y","U.S.10Y-I","C.B.Y.S.","L.S.Y.S.","F.F.R."]
     data={q:f[q].dropna().iloc[-2:] for q in cols}
     for q in enumerate(st.columns(len(cols))):
         q[1].metric(
@@ -37,22 +36,29 @@ with t0:
     st.markdown("인플레이션 반영 10년 국채 일드는 국채 10년물 수익률을 CPI-deflating한 것으로 명목 국채 일드다.")
     fg,ax=plt.subplots(figsize=(8,4))
     data=f.iy.dropna().loc["2007":]
-    ax.plot(data,alpha=.8,color="darkorange")
-    ax.axhline(color="orange",alpha=.5,y=data.iloc[-1])
+    ax.plot(data,alpha=.7,color="darkorange")
+    ax.axhline(color="orange",alpha=.7,y=data.iloc[-1])
     st.pyplot(fg)
-    # row 1
-    st.subheader("U.S.10Y+F.F.R.+Upcoming F.F.R.")
-    st.markdown("10년 국채 일드, 기준금리(담보대익일조달금리), 차기 예상 기준금리이다. CMA 등 익일물 대출금리가 SOFR다.")
+    # row
+    st.subheader("U.S.02Y, F.F.R.")
+    st.markdown("2년 국채 일드, 담보대익일조달금리, 차기 예상 기준금리이다. CMA 등 익일물 대출금리가 SOFR다.")
     fg,ax=plt.subplots(figsize=(8,4))
-    data=f[["fr","by"]].loc["2007":].dropna()
+    data=f[["fr","us02y"]].loc["2007":].dropna()
     ax.plot(data,alpha=.8)
-    ax.axhline(color="blue",alpha=.5,y=data.iloc[-1,0]+dff_next_bp)
-    ax.axhline(color="orange",alpha=.5,y=data.iloc[-1,1])
+    ax.axhline(color="blue",alpha=.7,y=data.iloc[-1,0]+dff_next_bp)
+    ax.axhline(color="orange",alpha=.7,y=data.iloc[-1,1])
     st.pyplot(fg)
-    # row 2
+    # row
+    st.subheader("U.S.02Y-F.F.R.")
+    st.markdown("Spread")
+    fg,ax=plt.subplots(figsize=(8,4))
+    data=f["us02y"]-f["fr"].loc["2007":].dropna()
+    ax.plot(data,alpha=.8)
+    st.pyplot(fg)
+    # row
     st.subheader("Long-Short Yield Spread")
     st.markdown("10년물-3개월물 일드 스프레드, 기업채 스프레드 등 몇 가지 거시지표 및 상품 가격이다. 안전자산으로서 국채는 장기물 일드가 단기물 일드보다 높게 유지되지만, 장기 경제 컨센서스가 불량해지면 단기물 일드가 높아진다. 일드 역전에의 도상에 있는 것을 일드 커브 플래트닝, 반대의 경우를 스티프닝이라고 한다. 일드 커브 역전으로부터 보통 20분기 이내에 경기침체가 발생하는 등, 장단기 스프레드 흐름은 금리정책에 대한 시장의 반응을 기탄없이 대변하며, 경제 사이클 추론에 기업채 스프레드와 함께 더할나위 없는 지표로 된다.")
-    freq="3d"
+    freq="2d"
     f_cols=["hs","ic","cb","ys"]
     f_cols_name=["HSI","JC","CBYS","LSYS"]
     f0=f[f_cols]
@@ -67,11 +73,11 @@ with t0:
     ax.set_xlabel(f"{freq=}")
     plt.xticks(rotation=45)
     st.pyplot(fg)
-    # row 3
+    # row
     st.subheader("Correleation")
     st.markdown("몇 가지 계열 1차 변화량의 Pearson 상관계수이다. 약간 monotonic 계열간 관계를 짐작할 수 있다.")
     freq="2d"
-    f_cols=["by","si","hg","sp","hs"]
+    f_cols=["us02y","si","hg","sp","hs"]
     f0=f[f_cols]
     f1=f0.resample(freq).mean().diff().dropna()
     f2=f1.apply(lambda q:scipy.stats.zscore(scipy.stats.yeojohnson(q)[0]))
@@ -182,14 +188,14 @@ with t3:
         # plot guesses
         fg,ax=plt.subplots(2,1,figsize=(8,8))
         ax[0].scatter(x0.values,y0.values,
-            color="tomato",alpha=.3)
+            color="tomato",alpha=.8)
         ax[0].plot(x1,y1_guess,
             color="navy",alpha=1,linewidth=2)
         # plot residues
         residue=y1_guess-y1_answer
         residue_devi=np.std(residue)*.5
         ax[1].scatter(y1_guess,y1_guess-y1_answer,
-            color="tomato",alpha=.3)
+            color="tomato",alpha=.8)
         ax[1].hlines(
             y=0,
             xmin=min(y1_guess)-residue_devi,
