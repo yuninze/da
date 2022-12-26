@@ -6,7 +6,7 @@ from da import *
 # ornament
 dff_next_bp=.25
 st.set_page_config(page_title="Product Snapshot",layout="centered")
-print(f"{datetime.now()}::initialized in {os.getcwd()}")
+print(f"{datetime.now()}::initialized")
 
 # yielding st.experimental_memo
 def getdata_(path="c:/code/f.csv"):
@@ -15,10 +15,12 @@ f=getdata_()
 
 # head
 st.header("Product Snapshot")
+
+# tabs
 prods=["Indices","Commodities","Macro","Utilities","Citations"]
 t0,t1,t2,t3,t4=st.tabs(prods)
 
-# tabs
+# tab
 with t0:
     # row
     st.subheader("Latests")
@@ -33,7 +35,7 @@ with t0:
             delta=f"{data[cols[q[0]]].diff()[-1]:.3f} "
                     f"({data[cols[q[0]]].pct_change()[-1]*100:.2f}%)")
     st.subheader("Inflation-indexed U.S.10Y")
-    st.markdown("인플레이션 반영 10년 국채 일드는 국채 10년물 수익률을 CPI-deflating한 것으로 명목 국채 일드다.")
+    st.markdown("인플레이션 반영 10년 국채 일드는 국채 10년물 수익률을 CPI-deflating한 것으로 명목 국채 일드임.")
     fg,ax=plt.subplots(figsize=(8,4))
     data=f.iy.dropna().loc["2007":]
     ax.plot(data,alpha=.7,color="darkorange")
@@ -41,7 +43,7 @@ with t0:
     st.pyplot(fg)
     # row
     st.subheader("U.S.02Y, F.F.R.")
-    st.markdown("2년 국채 일드, 담보대익일조달금리, 차기 예상 기준금리이다. CMA 등 익일물 대출금리가 SOFR다.")
+    st.markdown("2년 국채 일드, 담보대익일조달금리(행간대출금리) 및 예상 차기 금리. CMA 등 익일물 일드가 곧 SOFR임.")
     fg,ax=plt.subplots(figsize=(8,4))
     data=f[["fr","us02y"]].loc["2007":].dropna()
     ax.plot(data,alpha=.8)
@@ -50,14 +52,14 @@ with t0:
     st.pyplot(fg)
     # row
     st.subheader("U.S.02Y-F.F.R.")
-    st.markdown("Spread")
+    st.markdown("국채 2년물 일드와 실질 기준금리 스프레드.")
     fg,ax=plt.subplots(figsize=(8,4))
     data=f["us02y"]-f["fr"].loc["2007":].dropna()
     ax.plot(data,alpha=.8)
     st.pyplot(fg)
     # row
     st.subheader("Long-Short Yield Spread")
-    st.markdown("10년물-3개월물 일드 스프레드, 기업채 스프레드 등 몇 가지 거시지표 및 상품 가격이다. 안전자산으로서 국채는 장기물 일드가 단기물 일드보다 높게 유지되지만, 장기 경제 컨센서스가 불량해지면 단기물 일드가 높아진다. 일드 역전에의 도상에 있는 것을 일드 커브 플래트닝, 반대의 경우를 스티프닝이라고 한다. 일드 커브 역전으로부터 보통 20분기 이내에 경기침체가 발생하는 등, 장단기 스프레드 흐름은 금리정책에 대한 시장의 반응을 기탄없이 대변하며, 경제 사이클 추론에 기업채 스프레드와 함께 더할나위 없는 지표로 된다.")
+    st.markdown("10년물과 3개월물의 일드 스프레드, 기업채 일드 스프레드 등. 장기 경제 컨센서스가 불량해지면 단기물 일드가 장기물 일드보다 커짐. 단장기 일드 스프레드와 기업채 스프레드는 시의적절한(적시성 높은) 경제 사이클 지표임.")
     freq="2d"
     f_cols=["hs","ic","cb","ys"]
     f_cols_name=["HSI","JC","CBYS","LSYS"]
@@ -75,7 +77,7 @@ with t0:
     st.pyplot(fg)
     # row
     st.subheader("Correleation")
-    st.markdown("몇 가지 계열 1차 변화량의 Pearson 상관계수이다. 약간 monotonic 계열간 관계를 짐작할 수 있다.")
+    st.markdown("몇 가지 계열의 1차 변화량의 Pearson 상관계수.")
     freq="2d"
     f_cols=["us02y","si","hg","sp","hs"]
     f0=f[f_cols]
@@ -90,7 +92,7 @@ with t1:
     cols_nm=["W.T.I.","Nat-Gas","Silver","Copper","Soybean"]
     # row 0
     st.subheader("Latests")
-    st.markdown("주요 원자재의 가격, 명목 가격의 상위 %를 표시한다. ADF를 1% 신뢰구간에서 통과하는 비정상성의 가격을 가지는 상품도 있다.")
+    st.markdown("주요 원자재의 가격, 명목 가격의 상위 %. ADF를 1% 신뢰구간에서 통과하는 가격의 상품도 있음.")
     ie=deflator(f)
     data={q:act(f[q],ie).dropna().iloc[-5:] for q in cols}
     for q in enumerate(st.columns(len(cols))):
@@ -112,7 +114,7 @@ with t1:
             delta=None,delta_color="off")
     # row 2
     st.subheader("Rolled Standard Deviation")
-    st.markdown("x일 변화율 평균의 표준편차의 1,2 표준점수(σ)를 보인다. 여러 파라메터가 있는 만큼, 상품 가격과 같이 천변만화하는 숫자에 대한 평활법의 실효성은 없다.")
+    st.markdown("x일 변화율 평균의 표준편차의 1,2 표준점수(σ). 상품 가격과 같이 천변만화하는 숫자에 대한 평활법의 실효성은 없음.")
     dur=st.slider(
         "Duration (days)",
         min_value=5,
@@ -169,7 +171,7 @@ with t3:
     examplars=[("cb","fs"),("cb","ic"),("cl","ie"),("ng","fert")]
     # row 0
     st.subheader("Linregress")
-    st.markdown("단선형회귀를 수행한다. 여기서의 계열은 비정상이고 변환을 하지 않아 의사회귀가 생긴다. 계열간 상관계수는 sampling rate가 높을 수록 낮아진다. 또한, Random walking에서 계열간 선형관계는 옅어진다. 10YIE, CPI 등 유력 지표의 범위를 바탕으로 grouping해 조건하 상관성을 볼 수 있다.")
+    st.markdown("단선형회귀 수행. 변환을 하지 않아 의사회귀가 생김. 계열간 상관계수는 sampling rate가 높을수록 낮음.")
     q0,q1=st.columns(2)
     x0_=q0.selectbox("x",f.columns)
     y0_=q1.selectbox("y",f.columns)
