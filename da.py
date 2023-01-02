@@ -27,7 +27,7 @@ intern={"ci":"CPIAUCSL",
         "ic":"ICSA",
         "pr":"PAYEMS",
         "ys":"T10Y3M",
-        "fr":"SOFR", # appending SOFR as DFF
+        "fr":"SOFR", # appending SOFR as DFF, DFF was based on DFF
         "nk":"NIKKEI225",
         "fert":"PCU325311325311",
         "iy":"DFII10",
@@ -166,16 +166,19 @@ def act(t,i=None):
         a_=t.dropna()
     elif not i is None:
         a=pd.concat([t,i],axis=1).dropna()
-        a_=a.iloc[:,0]
-        a=a.iloc[:,0] / a.iloc[:,1]
+        a_=a.iloc[:,0] # i
+        a=a.iloc[:,0] / a.iloc[:,1] # i_
     else:
         a=t.dropna()
         a_=t.dropna()
     # using yeo-johnson
-    if not np.sign(a).sum()==len(a):
+    if not int(np.sign(a).sum())==len(a):
         a_l=scipy.stats.yeojohnson(a)[0]
     else:
-        a_l=np.log(a)
+        if t.name=="zs":
+            a_l=np.log(np.log(a))
+        else:
+            a_l=np.log(a)
     # de-ta
     a_ls   =scipy.stats.zscore(a_l)
     a_lsp  =scipy.stats.norm.cdf(a_ls,

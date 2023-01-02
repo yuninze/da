@@ -35,7 +35,7 @@ with t0:
             delta=f"{data[cols[q[0]]].diff()[-1]:.3f} "
                     f"({data[cols[q[0]]].pct_change()[-1]*100:.2f}%)")
     st.subheader("Inflation-indexed U.S.10Y")
-    st.markdown("인플레이션 반영 10년 국채 일드는 국채 10년물 수익률을 CPI-deflating한 것으로 명목 국채 일드임.")
+    st.markdown("인플레이션 반영 10년 국채 일드는 국채 10년물 수익률을 CPI-deflating한 것으로 명목 국채 일드임. 10-Years TIPS-US10Y=10Y BIR")
     fg,ax=plt.subplots(figsize=(8,4))
     data=f.iy.dropna().loc["2007":]
     ax.plot(data,alpha=.7,color="darkorange")
@@ -43,7 +43,7 @@ with t0:
     st.pyplot(fg)
     # row
     st.subheader("U.S.02Y, F.F.R.")
-    st.markdown("2년 국채 일드, 담보대익일조달금리(행간대출금리) 및 예상 차기 금리. CMA 등 익일물 일드가 곧 SOFR임.")
+    st.markdown("2년 국채 일드, 담보대익일조달금리 및 예상 차기 금리. CMA 등 익일물 일드가 곧 SOFR임.")
     fg,ax=plt.subplots(figsize=(8,4))
     data=f[["fr","us02y"]].loc["2007":].dropna()
     ax.plot(data,alpha=.8)
@@ -52,7 +52,7 @@ with t0:
     st.pyplot(fg)
     # row
     st.subheader("U.S.02Y-F.F.R.")
-    st.markdown("국채 2년물 일드와 실질 기준금리 스프레드.")
+    st.markdown("US02Y-SOFR Lower -> upcoming easing or stopping hiking.")
     fg,ax=plt.subplots(figsize=(8,4))
     data=f["us02y"]-f["fr"].loc["2007":].dropna()
     ax.plot(data,alpha=.8)
@@ -149,7 +149,7 @@ with t2:
     st.pyplot(fg)
     # row 1
     st.subheader("Price Indices")
-    st.markdown("Price indices are a deflator of given period. Values are shifted for 1 month.")
+    st.markdown("Price indices are a deflator of given period. Those MoM-change percentages are shifted for 1 month.")
     cols=["pi","ci","ii"]
     cols_name=["PPI","CPI","PCE"]
     data=f[cols].resample("m").mean().pct_change().shift()[3:]
