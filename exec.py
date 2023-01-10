@@ -1,6 +1,7 @@
 from da import *
 def exec(port=11115,path="c:/code/da/"):
-    os.system(f"streamlit run {path}app.py --server.port {port}")
+    os.chdir(path)
+    os.system(f"streamlit run app.py --server.port {port}")
 try:
     f=getdata(save=True)
 except:

@@ -1,6 +1,5 @@
 import streamlit as st
 from datetime import datetime
-from PIL import Image
 from da import *
 
 # ornament
@@ -24,7 +23,7 @@ t0,t1,t2,t3,t4=st.tabs(prods)
 with t0:
     # row
     st.subheader("Latests")
-    st.markdown("대표성과 적시성이 높은 상품 가격 또는 지표를 표시한다.")
+    st.markdown("Innermost criterions")
     cols=["us02y","iy","cb","ys","fr"]
     cols_nm=["U.S.02Y","U.S.10Y-I","C.B.Y.S.","L.S.Y.S.","F.F.R."]
     data={q:f[q].dropna().iloc[-2:] for q in cols}
@@ -37,37 +36,37 @@ with t0:
     st.subheader("Inflation-indexed U.S.10Y")
     st.markdown("인플레이션 반영 10년 국채 일드는 국채 10년물 수익률을 CPI-deflating한 것으로 명목 국채 일드임. 10-Years TIPS-US10Y=10Y BIR")
     fg,ax=plt.subplots(figsize=(8,4))
-    data=f.iy.dropna().loc["2007":]
+    data=f.iy.loc["2010":].dropna()
     ax.plot(data,alpha=.7,color="darkorange")
     ax.axhline(color="orange",alpha=.7,y=data.iloc[-1])
     st.pyplot(fg)
     # row
     st.subheader("U.S.02Y, F.F.R.")
-    st.markdown("2년 국채 일드, 담보대익일조달금리 및 예상 차기 금리. CMA 등 익일물 일드가 곧 SOFR임.")
+    st.markdown("2년 국채 일드, 담보대익일조달금리 및 예상 차기 금리.")
     fg,ax=plt.subplots(figsize=(8,4))
-    data=f[["fr","us02y"]].loc["2007":].dropna()
+    data=f[["fr","us02y"]].loc["2010":].dropna()
     ax.plot(data,alpha=.8)
     ax.axhline(color="blue",alpha=.7,y=data.iloc[-1,0]+dff_next_bp)
     ax.axhline(color="orange",alpha=.7,y=data.iloc[-1,1])
     st.pyplot(fg)
     # row
     st.subheader("U.S.02Y-F.F.R.")
-    st.markdown("US02Y-SOFR Lower -> upcoming easing or stopping hiking.")
+    st.markdown("Lower US02Y-SOFR means upcoming easing or stopping hiking.")
     fg,ax=plt.subplots(figsize=(8,4))
-    data=f["us02y"]-f["fr"].loc["2007":].dropna()
+    data=f["us02y"]-f["fr"].loc["2010":].dropna()
     ax.plot(data,alpha=.8)
     st.pyplot(fg)
     # row
     st.subheader("Long-Short Yield Spread")
-    st.markdown("10년물과 3개월물의 일드 스프레드, 기업채 일드 스프레드 등. 장기 경제 컨센서스가 불량해지면 단기물 일드가 장기물 일드보다 커짐. 단장기 일드 스프레드와 기업채 스프레드는 시의적절한(적시성 높은) 경제 사이클 지표임.")
+    st.markdown("10년물-3개월물 일드 스프레드, 기업채 일드 스프레드.")
     freq="2d"
-    f_cols=["hs","ic","cb","ys"]
-    f_cols_name=["HSI","JC","CBYS","LSYS"]
+    f_cols=["ic","cb","ys"]
+    f_cols_name=["JC","CBYS","LSYS"]
     f0=f[f_cols]
     f1=f0.resample(freq).mean().dropna()
-    f2=f1[["hs","ic","cb"]].apply(lambda q:scipy.stats.zscore(scipy.stats.yeojohnson(q)[0]))
-    f2["ys"]=scipy.stats.zscore(f1["ys"])
-    f3=f2.loc["2020":].set_axis(f_cols_name,axis=1)
+    f2=f1[["ic","cb"]].apply(lambda q:scipy.stats.zscore(scipy.stats.yeojohnson(q)[0],nan_policy="omit"))
+    f2["ys"]=scipy.stats.zscore(f1["ys"],nan_policy="omit")*-1
+    f3=f2.loc["2010":].set_axis(f_cols_name,axis=1)
     fg,ax=plt.subplots(figsize=(8,4))
     ax.plot(f3,alpha=.8)
     ax.legend(f_cols_name)
@@ -78,13 +77,12 @@ with t0:
     # row
     st.subheader("Correleation")
     st.markdown("몇 가지 계열의 1차 변화량의 Pearson 상관계수.")
-    freq="2d"
-    f_cols=["us02y","si","hg","sp","hs"]
+    freq="3d"
+    f_cols=["us02y","ys","sp","hs","hg","si","zs","zc"]
     f0=f[f_cols]
     f1=f0.resample(freq).mean().diff().dropna()
-    f2=f1.apply(lambda q:scipy.stats.zscore(scipy.stats.yeojohnson(q)[0]))
     fg,ax=plt.subplots(figsize=(6,6))
-    hm(f2.corr(),ax=ax)
+    hm(f1.corr(),ax=ax)
     st.pyplot(fg)
 with t1:
     # param
@@ -129,21 +127,21 @@ with t2:
     # row 0
     st.subheader("Coporate Bond Yield Spread vs. Labor Market")
     st.markdown("Coporate bond yield is a prominent forecaster of labor market.")
-    cols=["cb","ic","ur"]
-    cols_name=["CBYS","ICSA","UNRATE"]
-    data=(f[cols].resample("5d").mean().dropna()
+    cols=["cb","ic","pr","ur"]
+    cols_name=["CBYS","ICSA","NFP","UNRATE"]
+    data=(f[cols].resample("m").mean().dropna(how="all")
         .set_axis(cols_name,axis=1)
-        .apply(lambda q:scipy.stats.zscore(scipy.stats.yeojohnson(q)[0])))
+        .apply(lambda q:scipy.stats.zscore(q,nan_policy="omit")))
     dur=st.slider(
         "Duration (year)",
         min_value=data.index.min().year,
         max_value=data.index.max().year,
-        value=(2006,2010),
-        step=1,)
+        value=(2021,2023),
+        step=1,key="0")
     data_=data.loc[f"{dur[0]}":f"{dur[1]}"]
     fg,ax=plt.subplots(figsize=(8,4))
     ax.plot(data_,alpha=.8)
-    ax.set_ylabel("log/z-score")
+    ax.set_ylabel("z-score")
     ax.legend(cols_name)
     plt.xticks(rotation=60)
     st.pyplot(fg)
@@ -157,12 +155,12 @@ with t2:
         "Duration (year)",
         min_value=data.index.min().year,
         max_value=data.index.max().year,
-        value=(2019,2022),
-        step=1,)
+        value=(2020,2023),
+        step=1,key="1")
     data_=data.loc[f"{dur[0]}":f"{dur[1]}"]
     fg,ax=plt.subplots(figsize=(8,4))
     ax.plot(data_,alpha=.8)
-    ax.set_ylabel("pct/MoM change")
+    ax.set_ylabel("MoM pct change")
     ax.legend(cols_name)
     plt.xticks(rotation=60)
     st.pyplot(fg)

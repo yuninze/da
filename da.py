@@ -27,7 +27,7 @@ intern={"ci":"CPIAUCSL",
         "ic":"ICSA",
         "pr":"PAYEMS",
         "ys":"T10Y3M",
-        "fr":"SOFR", # appending SOFR as DFF, DFF was based on DFF
+        "fr":"DFF", # appending SOFR as DFF, DFF was based on DFF
         "nk":"NIKKEI225",
         "fert":"PCU325311325311",
         "iy":"DFII10",
@@ -161,7 +161,7 @@ def deflator(f):
 
 def act(t,i=None):
     # if deflator is None, just calculate lzp
-    if t.name=="ng":
+    if t.name=="ng" or t.name=="spr":
         a=t.dropna()
         a_=t.dropna()
     elif not i is None:
